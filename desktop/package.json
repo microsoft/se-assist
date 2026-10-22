@@ -1,0 +1,81 @@
+{
+  "name": "se-assist",
+  "version": "2.2.1",
+  "description": "SE Assist — Cloud & AI Solution Engineer productivity tool for FSI",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test services/__tests__/**/*.test.js",
+    "test:work-outputs": "node scripts/run-electron-test.cjs test-work-outputs-electron.cjs",
+    "test:acr": "node scripts/run-electron-test.cjs test-acr-recovery-electron.cjs",
+    "generate:icons": "electron scripts/generate-icons.js",
+    "fetch-python": "node scripts/fetch-python.js",
+    "build:frontend": "npm --prefix ../src/frontend ci && npm --prefix ../src/frontend run build",
+    "build": "npm run build:frontend && npm run fetch-python && electron-builder --win"
+  },
+  "author": "ni-yao",
+  "license": "MIT",
+  "dependencies": {
+    "@azure/msal-node": "^5.6.0",
+    "@microsoft/workiq": "^1.0.0",
+    "better-sqlite3": "^12.9.0",
+    "html-to-text": "^9.0.5",
+    "ipaddr.js": "^2.5.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.seassist.desktop",
+    "productName": "SE Assist",
+    "directories": {
+      "output": "dist"
+    },
+    "publish": null,
+    "asarUnpack": [
+      "node_modules/@microsoft/workiq/**/*"
+    ],
+    "files": [
+      "**/*",
+      "!.env",
+      "!.npmrc",
+      "!**/*.log",
+      "!dist/**",
+      "!vendor/**"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/python",
+        "to": "python",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../shared",
+        "to": "shared",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../tools",
+        "to": "tools",
+        "filter": [
+          "**/*.py",
+          "!**/exports/**",
+          "!**/__pycache__/**"
+        ]
+      },
+      {
+        "from": "../src/frontend/dist",
+        "to": "src/frontend/dist"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    }
+  }
+}

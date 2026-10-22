@@ -1,0 +1,30 @@
+name: CI
+
+# Runs the desktop unit suite on every push and pull request. The suite is the
+# ground-truth signal for agentic changes to this codebase, so it must stay green.
+on:
+  push:
+    branches: [master, main, release]
+  pull_request:
+
+jobs:
+  desktop-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # Skip the native SQLite build, but initialize Electron's module entry point.
+      - name: Install test dependencies
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild electron
+
+      - name: Run unit tests
+        run: npm test

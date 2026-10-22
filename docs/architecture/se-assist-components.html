@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>SE Assist - data workflow and component reference</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --ink:#1d2b47; --dim:#596a80; --flow:#2f6fd0; --flowbg:#eaf1fc; --flowedge:#b7cdee;
+    --ai:#6a5cd6; --aibg:#f0edfc; --aiedge:#cdc6ed;
+    --data:#138876; --databg:#e7f4ef; --dataedge:#b4d9cf;
+    --ext:#5b6b86; --extbg:#edf0f6; --extedge:#c7d0df;
+    --ui:#a551b8; --uibg:#f7edf9; --uiedge:#dec1e5;
+    --action:#a86c20; --actionbg:#fbf2e5; --actionedge:#e5ceac;
+    --cardedge:#d6deea; --stage-width:3200px; --stage-height:2880px;
+  }
+  * { box-sizing:border-box; margin:0; padding:0 }
+  html,body { background:#edf1f7; color:var(--ink); font-family:"Segoe UI",Arial,sans-serif }
+  button,select { font:inherit; color:inherit }
+  button,a,select { touch-action:manipulation }
+  button { cursor:pointer }
+  a { color:#245da9 }
+  :focus-visible { outline:3px solid var(--flow); outline-offset:3px }
+  .toolbar {
+    display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; padding:12px 20px;
+    background:#fff; border-bottom:1px solid var(--cardedge); font-size:12px;
+  }
+  .toolbar button,.toolbar select { padding:7px 12px; background:#fff; border:1px solid #bdc9db; border-radius:6px }
+  .toolbar button[aria-pressed="true"] { background:var(--flowbg); border-color:var(--flow) }
+  .toolbar label { display:flex; align-items:center; gap:8px }
+  #zoom-status { min-width:90px }
+  #diagram-scroll { width:100%; max-height:calc(100vh - 80px); overflow:auto; scrollbar-gutter:stable }
+  #viewport { position:relative; width:100%; height:min(90vw,2880px) }
+  #stage {
+    position:absolute; width:var(--stage-width); height:var(--stage-height); overflow:hidden;
+    transform-origin:top left; -webkit-font-smoothing:antialiased;
+    background:radial-gradient(3400px 2500px at 50% 0,#fff 0,#f5f7fb 75%,#edf1f7 100%);
+  }
+  .h-title { position:absolute; left:40px; top:20px; font-size:28px; font-weight:700; z-index:6 }
+  .h-sub { position:absolute; left:40px; top:59px; font-size:12px; color:var(--dim); z-index:6 }
+  .legend {
+    position:absolute; right:40px; top:23px; display:flex; gap:22px; font-size:12px; z-index:6;
+    padding:10px 14px; border:1px solid var(--cardedge); border-radius:8px; background:#fff;
+  }
+  .key { display:flex; align-items:center; gap:7px }
+  .sw { width:28px; border-top:2px solid var(--flow) }
+  .sw.read { border-color:var(--data) }
+  .sw.action { border-color:var(--action) }
+  .sw.ai { border-color:var(--ai) }
+  .model-key {
+    position:absolute; left:40px; top:86px; width:3120px; height:58px; z-index:6;
+    display:grid; grid-template-columns:1fr 1.2fr 1fr 1.35fr; align-items:center; gap:22px;
+    padding:10px 16px; background:#fff; border:1px solid var(--aiedge); border-radius:8px; font-size:12px; line-height:1.4;
+  }
+  .model-key b { color:var(--ai) }
+  .zone { position:absolute; border:1px solid; border-radius:12px; z-index:1 }
+  .zh { position:absolute; top:10px; left:15px; font-size:12px; font-weight:700; letter-spacing:.6px }
+  .zone.inbound { background:var(--extbg); border-color:var(--extedge) }
+  .zone.processing { background:var(--flowbg); border-color:var(--flowedge) }
+  .zone.stores { background:var(--databg); border-color:var(--dataedge) }
+  .zone.ui-group { background:var(--uibg); border-color:var(--uiedge) }
+  .zone.ui-group .zh { color:var(--ui) }
+  .zone.actions { background:var(--actionbg); border-color:var(--actionedge) }
+  .zone-caption { position:absolute; font-size:12px; color:var(--dim); line-height:1.4; z-index:5 }
+  .n {
+    position:absolute; display:flex; flex-direction:column; gap:4px;
+    padding:12px 14px; border:1px solid var(--cardedge); border-left:4px solid;
+    border-radius:8px; background:#fff; z-index:4; font-size:12px; line-height:1.35;
+  }
+  .n h3 { font-size:16px; font-weight:600; line-height:1.25 }
+  .n .sub,.n .note { color:var(--dim) }
+  .n .note { font-style:italic }
+  .n.t-ext { border-left-color:var(--ext) }
+  .n.t-flow { border-left-color:var(--flow) }
+  .n.t-data { border-left-color:var(--data) }
+  .n.t-ui { border-left-color:var(--ui) }
+  .n.t-action { border-left-color:var(--action) }
+  .n.t-ai { border-left-color:var(--ai) }
+  .n.shared { border-top-style:dashed; border-right-style:dashed; border-bottom-style:dashed }
+  .n.connector { padding:8px 10px; gap:3px }
+  .n.connector h3 { font-size:16px }
+  .n.connector .agent-list { margin:0; padding:0; border:0 }
+  .steps { list-style:none; display:flex; flex-direction:column; gap:4px }
+  .steps li::before { content:"- "; color:var(--flow) }
+  .agent-list { border-top:1px solid #e2e6ef; margin-top:3px; padding-top:4px }
+  .agent-header,.agent-row { display:grid; grid-template-columns:minmax(0,1.8fr) 86px minmax(0,1.1fr); gap:8px; align-items:start }
+  .agent-header { color:var(--dim); font-weight:600; padding-bottom:3px }
+  .agent-row { padding:2px 0; min-height:20px; border-top:1px solid #f1f2f7 }
+  .agent-row .model { color:var(--ai); font-weight:600 }
+  .agent-row.hidden-agent { color:#707b8c; background:#faf9fc }
+  .no-agent { color:var(--dim) }
+  .read-set { display:flex; flex-wrap:wrap; align-items:center; gap:4px; min-height:20px }
+  .read-set span { margin-right:3px; color:var(--dim) }
+  .store-ref {
+    display:inline-flex; justify-content:center; align-items:center; min-width:23px; height:18px;
+    padding:0 5px; border:1px solid var(--dataedge); border-radius:4px; background:var(--databg); color:#0b6a5b; font-size:12px;
+  }
+  .writes { color:#80551d }
+  .n.store { cursor:pointer }
+  .n.store[aria-pressed="true"] { outline:2px solid var(--data); outline-offset:3px }
+  svg#wires { position:absolute; inset:0; width:var(--stage-width); height:var(--stage-height); z-index:3; pointer-events:none }
+  .readflow { opacity:.65 }
+  .elabel.readflow { opacity:1 }
+  .readflow.muted { opacity:.04 }
+  .elabel.readflow.muted { opacity:.12 }
+  .readflow.focused { opacity:1 }
+  .n.dimmed { opacity:.3 }
+  .elabel {
+    position:absolute; transform:translate(-50%,-50%); z-index:5; padding:2px 5px;
+    border:1px solid #d3dce9; border-radius:5px; background:#fff; font-size:12px; line-height:1.15; white-space:nowrap;
+  }
+  .elabel.read-label { color:#0b6a5b; border-color:var(--dataedge) }
+  .foot { position:absolute; left:40px; font-size:12px; color:var(--dim); z-index:6 }
+  .view-nav { display:flex; flex-wrap:wrap; justify-content:center; gap:10px 24px; margin:20px; font-size:16px }
+  #reference { max-width:1540px; margin:24px auto; padding:20px; background:#fff; border:1px solid var(--cardedge); border-radius:12px; font-size:16px; line-height:1.5 }
+  #reference summary { font-weight:600; cursor:pointer }
+  #reference p { margin:12px 0 }
+  #reference h2 { font-size:16px; margin:20px 0 8px }
+  #reference ul { padding-left:24px }
+  #reference code { font-size:12px; overflow-wrap:anywhere }
+  .source-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(350px,1fr)); gap:12px }
+  .source-entry { padding:12px; border:1px solid var(--cardedge); border-radius:8px; break-inside:avoid }
+  .source-entry b { font-size:16px }
+  .source-entry p { margin:5px 0; font-size:12px }
+  .source-entry code { display:block }
+  @media print {
+    @page { size:3200px 2880px; margin:0 }
+    html,body { background:#fff }
+    .toolbar,.view-nav,#reference { display:none }
+    #diagram-scroll { width:var(--stage-width); max-height:none; overflow:visible; scrollbar-gutter:auto }
+    #viewport { width:var(--stage-width) !important; height:var(--stage-height) !important }
+    #stage { transform:none !important }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar" aria-label="Workflow controls">
+  <button id="fit" type="button" aria-pressed="true">Fit width</button>
+  <button id="actual" type="button" aria-pressed="false">100% / readable</button>
+  <output id="zoom-status" aria-live="polite"></output>
+  <label>Trace storage <select id="storage-focus"><option value="">All storage read paths</option></select></label>
+  <span>Click a storage card or a UI read badge to isolate its paths. Scroll to pan at 100%.</span>
+</div>
+<div id="diagram-scroll" tabindex="0" aria-label="Scrollable data workflow">
+<div id="viewport">
+<main id="stage" aria-label="SE Assist inbound data, processing, local storage, UI reads, agents and explicit external changes">
+  <h1 class="h-title">SE Assist | Data workflow &amp; component reference</h1>
+  <p class="h-sub">Inbound reads → processing → storage / live buffers → UI features | Logical data dependencies; runtime mediation is intentionally abstracted away | Source: c2ff468</p>
+  <div class="legend" aria-label="Diagram legend">
+    <span class="key"><i class="sw"></i> inbound / processed data</span>
+    <span class="key"><i class="sw read"></i> storage → UI data</span>
+    <span class="key"><i class="sw action"></i> explicit execution</span>
+    <span class="key"><i class="sw ai"></i> model inference</span>
+  </div>
+  <div class="model-key">
+    <span><b>Primary</b> = configured Primary model.<br>Most catalog agents are not pinned to a model ID.</span>
+    <span><b>Utility</b> = configured Utility model; Primary when not separately configured.<br><b>/high</b> marks an explicit agent reasoning requirement.</span>
+    <span><b>Luna/high</b> = <b>gpt-5.6-luna / high</b>, Secretary only.<br><b>*</b> = Copilot-only. Hidden Secretary rows are grey.</span>
+    <span>All model work uses the shared scheduler. No silent provider substitution.<br>Eligible Foundry requests use the configured deployment, not a second role-specific model.</span>
+  </div>
+  <section class="zone inbound" id="inbound" style="left:40px;top:166px;width:3120px;height:250px">
+    <h2 class="zh">1 INBOUND READS | API and MCP are distinct connections; HTTPS pages, browser sessions and local inputs are labelled separately</h2>
+  </section>
+  <section class="zone" id="live-read-connections" aria-label="Grouped live read connections, not a broker" style="left:1916px;top:198px;width:584px;height:202px;border-color:var(--extedge);background:var(--extbg)"></section>
+  <section class="zone processing" id="processing" style="left:40px;top:464px;width:3120px;height:360px">
+    <h2 class="zh">2 PROCESS</h2>
+  </section>
+  <section class="zone stores" id="stores" style="left:40px;top:896px;width:3120px;height:250px">
+    <h2 class="zh">3 STORE</h2>
+  </section>
+  <p class="zone-caption" style="left:40px;top:147px">Storage key: C / E / A / D / W are domains in the SAME local SQLite database, not five databases. Q / L are transient; F / P identify files and configuration.</p>
+  <p class="zone-caption" style="left:40px;top:1394px;width:35px">4 UI</p>
+  <section class="zone actions" id="actions" style="left:40px;top:2530px;width:3120px;height:268px">
+    <h2 class="zh">5 EXECUTE</h2>
+  </section>
+  <svg id="wires" aria-hidden="true"></svg>
+  <div id="nodes"></div>
+  <p class="foot" style="top:2802px">Representative execution paths are drawn above. UI write keys: CRM = explicit Dynamics API change; MAIL = explicit WorkIQ Outlook draft. A / Q / D writes refresh caches, not external sources.</p>
+  <p class="foot" style="top:2822px">Storage rails are logical read dependencies, not a gateway or broker. UI arrows show returned data, not direct database access. Agents are listed under their invoking feature; they do not execute in the UI.</p>
+  <p class="foot" style="top:2845px">One independent Windows installation. Saved User Home TPIDs define active scope; off-roster history is archived in place. Local-first does not mean local-only inference. No hosted SE Assist backend.</p>
+</main>
+</div>
+</div>
+<nav class="view-nav" aria-label="Architecture views">
+  <a href="se-assist-overview.html">1 Solution overview</a>
+  <a href="se-assist-runtime.html">2 Runtime &amp; trust boundaries</a>
+  <a href="se-assist-components.html" aria-current="page">3 Data workflow &amp; components</a>
+  <a href="se-assist-components.png" download>Download full-resolution workflow PNG</a>
+</nav>
+<details id="reference">
+  <summary>Reading guide, exact agent/model/action contracts, source index and design notes</summary>
+  <p><strong>Read from inbound data to processing, storage and UI.</strong> Each storage letter identifies one logical domain. UI badges name a feature's primary read set, including the shared panels explicitly listed on its card. The green rails connect each domain to the UI groups that consume it. Use the storage selector to isolate one domain; use 100% for legible agent tables.</p>
+  <p>This is a functional data view, not a deployment or process diagram. Application-mediated access is abstracted away; the <a href="se-assist-runtime.html">runtime view</a> owns the execution and trust boundaries. A UI-to-storage relationship does not grant renderer access to SQLite, credentials, files or remote services. Not every page mounts at once, and most AI actions run on demand rather than as part of ingestion.</p>
+  <h2>Agent and model interpretation</h2>
+  <ul>
+    <li>All 23 catalog agents appear inside their invoking UI or data component. Python alias and weak-link utilities are separately identified as two non-catalog helpers. Components without an agent say so; deterministic joins, dates, validation, calculations and rendering have no LLM model.</li>
+    <li>Primary and Utility are model-selection contracts, not invented fixed model IDs. The Utility role resolves to the explicit Utility selection/configuration, or to Primary when no separate model is configured. A model error never triggers a different model. Only Secretary Search Scope and Secretary pin <code>gpt-5.6-luna</code> with <code>high</code> reasoning.</li>
+    <li>Work Agent, Work Outputs, influence analysis, ingestion AI and the two Secretary agents are Copilot-only. Connected Copilot failures do not switch to Foundry. For other eligible features, Foundry is considered only when Copilot is disconnected and Foundry is fully configured; both role labels use its configured deployment.</li>
+    <li>Agent lists include direct actions and explicitly embedded Workloads, Agenda, MeetingDetailPanel or milestone DetailCard actions. Navigating to another feature does not transfer that feature's agent ownership. The catalogue index below preserves exact IDs, roles, explicit reasoning and source files.</li>
+    <li>Secretary's UI is currently hidden. Work Agent is registered behind its investigation interface but has no current page caller; it is not presented as an active Deep Research control.</li>
+    <li>Only Work Agent has a model-selected tool loop: <code>workiq_search</code>, <code>workiq_read_email</code>, <code>workiq_read</code>, <code>workiq_document</code>, <code>web_search</code> and <code>web_read</code>. These six functions are read-only, with a 12-round bound. Other catalog tool names describe deterministic grounding, not extra MCP servers or permission grants.</li>
+    <li>Work Outputs research/gap steps call read adapters through application-controlled orchestration. They are not a second unrestricted tool-loop agent. Ingestion's desktop-resolved Utility selection is passed into Python; a legacy Python default is not a fixed desktop model.</li>
+  </ul>
+  <h2>Reads, live results and source modifications</h2>
+  <ul>
+    <li>Dynamics API reads and mutations are drawn twice to distinguish operations on the same connection. WorkIQ is similarly repeated for batch ingestion, live reads and the explicit mailbox draft action; these are not separate deployments.</li>
+    <li>HTTP POST is not necessarily a write: Power BI querydata/DAX, enterprise search, availability and meeting-time queries retrieve data. WorkIQ's <code>do_action</code> transport can carry a read query or an actual mutation; classify it by action semantics.</li>
+    <li>Dynamics POST/PATCH changes require an explicit user action, preserve opportunity-before-milestone gating and mirror successful changes locally. AI agents propose content; the application validates and executes the chosen operation.</li>
+    <li>Work Outputs' Outlook action creates a threaded <code>createReplyAll</code> draft through WorkIQ MCP. It does not send email. A generated reply saved in W is not itself an Outlook mailbox write; creating the Outlook draft is a separate action.</li>
+    <li>ACR has durable SQLite row caches/snapshots. Foundry usage has a 15-minute identity-scoped memory cache; capacity queries have a 60-minute identity-aware memory cache. Neither is a durable copy of usage/capacity rows in SQLite.</li>
+    <li>Directory reads use WorkIQ Graph fetch and write through to <code>org_people</code> in the local database. Live documents, original email, schedules, public pages and Seismic results are not all batch-ingested. Fetched meeting transcripts are saved with meeting work; selected research evidence/outputs can be saved independently.</li>
+    <li>Seismic uses an authenticated persistent browser session, not MCP and not a fabricated app REST API. Public search uses Copilot's read-only web MCP; publisher pages use direct HTTPS without user cookies or credentials.</li>
+    <li>The inference API is separated from external source modification. Bounded grounding leaves the device for inference, but model calls are not CRM or mailbox writes. Opening an external link is also not a write.</li>
+  </ul>
+  <h2>UI components and actual read/write sets</h2>
+  <div id="page-index" class="source-grid"></div>
+  <h2>Inbound, processing, storage and execution components</h2>
+  <div id="component-index" class="source-grid"></div>
+  <h2>All 23 catalog agents and two non-catalog ingestion utilities</h2>
+  <div id="agent-index" class="source-grid"></div>
+  <h2>Design notes</h2>
+  <p>3200 x 2880 reference poster, deliberately larger than the two 1920 x 1080 presentation views. The user's requested workflow replaces the former orchestration-centred component map: inbound reads, ordered processing, explicit storage domains, UI read sets, then separate outbound execution. No process/orchestration box is included. The overview and runtime views remain complementary, unchanged perspectives.</p>
+  <p>The architecture-diagram template's flat node geometry, common-region zones, orthogonal single-ended SVG connectors, semantic rails and three type sizes (28 / 16 / 12) are retained. Repeated connections distinguish operation semantics, not extra services. Storage dependency rails are keyed logical references, not a universal integration bus. Full per-component agent/model/action tables are visible rather than relegated to hover text.</p>
+  <p>The six UI groups preserve 21 routed surfaces and three shared visualization cards. All model calls use the existing shared scheduler, including desktop-launched Python helpers. Source revision: <code>c2ff468</code>. No live customer data, tokens, tenant inventory or user database content is embedded. This diagram changes documentation only, not application behavior or pagination.</p>
+</details>
+<script>
+const WIDTH = 3200, HEIGHT = 2880;
+const CATALOG = 'desktop\\services\\agents\\catalog.js';
+const IPC = 'desktop\\app-ipc.js';
+const UI = 'src\\frontend\\src\\components\\';
+const agents = [
+  {id:'comprehensive-summary',name:'Relationship Summary Analyst',role:'primary',action:'Draft account brief'},
+  {id:'tech-stack',name:'Technology Stack Analyst',role:'primary',action:'Evidence tech stack'},
+  {id:'acr-analysis',name:'Consumption Trend Analyst',role:'primary',action:'Explain ACR trends'},
+  {id:'sales-advisor',name:'Pre-Sales Strategy Coach',role:'primary',action:'Plan SE engagement'},
+  {id:'workload-suggester',name:'Workload Suggester',role:'primary',action:'Propose local work'},
+  {id:'workload-discoverer',name:'Workload Discoverer',role:'primary',action:'Match account work'},
+  {id:'customer-analysis',name:'Account Strategist',role:'primary',action:'Explain next actions'},
+  {id:'assistant',name:'SE Assist Copilot',role:'primary',action:'Prioritize SE work'},
+  {id:'secretary-scope',name:'Secretary Search Scope',role:'utility',pin:'gpt-5.6-luna',reasoning:'high',copilotOnly:true,hidden:true,action:'Resolve email window'},
+  {id:'secretary',name:'Secretary',role:'primary',pin:'gpt-5.6-luna',reasoning:'high',copilotOnly:true,hidden:true,action:'Find email todos'},
+  {id:'work-agent',name:'Work Agent',role:'primary',reasoning:'high',copilotOnly:true,registeredOnly:true,action:'Read-only tool loop'},
+  {id:'work-output',name:'Work Output Writer',role:'primary',reasoning:'high',copilotOnly:true,action:'Draft saved outputs'},
+  {id:'work-output-public-query',name:'Public Technical Query',role:'utility',reasoning:'high',copilotOnly:true,action:'Public-safe query'},
+  {id:'work-output-gap-triage',name:'Research Gap Triage',role:'utility',reasoning:'high',copilotOnly:true,action:'Classify research gaps'},
+  {id:'work-output-gap-answer',name:'Research Gap Judge',role:'primary',reasoning:'high',copilotOnly:true,action:'Verify quoted answer'},
+  {id:'meeting-prep',name:'Meeting Prep Assistant',role:'primary',action:'Prepare meeting'},
+  {id:'milestone-signal-finder',name:'Milestone Signal Finder',role:'primary',action:'Find linked evidence'},
+  {id:'milestone-comment-suggester',name:'Milestone Comment Suggester',role:'primary',action:'Draft CRM comment'},
+  {id:'milestone-hok-suggester',name:'Milestone HoK Activity Suggester',role:'primary',action:'Draft HoK activity'},
+  {id:'transcript-summarizer',name:'Meeting Transcript Summarizer',role:'primary',action:'Recap + local Tasks'},
+  {id:'org-title-mapper',name:'Org Title Mapper',role:'utility',action:'Propose role terms'},
+  {id:'org-roster-matcher',name:'Org Roster Matcher',role:'utility',action:'Rank found people'},
+  {id:'stakeholder-influence-analyst',name:'Stakeholder Influence Analyst',role:'primary',copilotOnly:true,action:'Infer evidenced stance'},
+];
+const helpers = [
+  {id:'alias-utility',name:'Account alias utility',role:'utility',copilotOnly:true,kind:'python-utility',action:'Propose account aliases',sources:['tools\\teams\\ai_aliases.py','tools\\common\\fast_ai.py']},
+  {id:'link-review-utility',name:'Weak-link reviewer',role:'utility',copilotOnly:true,kind:'python-utility',action:'Judge uncertain links',sources:['tools\\common\\ai_classify.py','tools\\common\\fast_ai.py']},
+];
+const milestoneAgents = ['milestone-signal-finder','milestone-comment-suggester','milestone-hok-suggester'];
+const workloadAgents = ['workload-suggester','workload-discoverer',...milestoneAgents];
+const meetingAgents = ['meeting-prep','transcript-summarizer','milestone-comment-suggester','milestone-hok-suggester'];
+const customerAgents = ['comprehensive-summary','tech-stack','acr-analysis','sales-advisor','customer-analysis'];
+const outputAgents = ['work-output','work-output-public-query','work-output-gap-triage','work-output-gap-answer'];
+const pageGroups = [
+  {id:'ui-daily-work',title:'Daily work & delivery',pages:['action-center','agenda','workloads','metrics']},
+  {id:'ui-customers',title:'Customers & relationships',pages:['customers','customer-detail','my-org','influence']},
+  {id:'ui-milestones',title:'Milestones & activities',pages:['milestones','milestone-map','milestone-timeline','hok']},
+  {id:'ui-consumption',title:'Consumption & capacity',pages:['consumption','account-consumption','foundry','quotas']},
+  {id:'ui-research',title:'Research & resources',pages:['deep-research','products','solutions','documentation']},
+  {id:'ui-workspace',title:'Workspace & shared UI',pages:['settings','assistant-ui','tasks-ui','setup-ui']},
+];
+const pages = [
+  {id:'action-center',title:'Action Center',file:'ActionCenter.jsx',route:'/action-center',reads:['C','E','W','D','L','F','P'],writes:['W','CRM'],agents:[...workloadAgents,'meeting-prep','transcript-summarizer','secretary-scope','secretary'],description:'Embedded Workloads + Agenda; Secretary UI hidden.',shared:['WorkloadsWorkspace','AgendaView','MeetingDetailPanel','DetailCard','SecretarySection (hidden)']},
+  {id:'agenda',title:'Agenda / meetings',file:'Agenda.jsx',route:'/agenda',reads:['C','E','W','D','L','F','P'],writes:['W','CRM'],agents:meetingAgents,description:'Meeting preparation, transcript, notes and follow-up.',shared:['MeetingDetailPanel']},
+  {id:'workloads',title:'Workloads',file:'WorkloadManagement.jsx',route:'/workload-management',reads:['C','E','W','D','L','P'],writes:['W','CRM'],agents:workloadAgents,description:'Suggest, discover and manage local customer work.'},
+  {id:'metrics',title:'Excellence Metrics',file:'Dashboard.jsx',route:'/',reads:['C','P'],writes:[],agents:[],description:'Deterministic milestone, opportunity and HoK metrics.'},
+  {id:'customers',title:'Customers',file:'CustomerActivity.jsx',route:'/email',reads:['C','E','W','P'],writes:['P'],agents:[],description:'Active accounts, communication evidence and account glance.'},
+  {id:'customer-detail',title:'Customer workspace',file:'CustomerDetail.jsx',route:'/customers/:id',reads:['C','E','W','A','D','L','F','P'],writes:['W','F','CRM'],agents:[...customerAgents,...meetingAgents],description:'Five account analysts + shared meeting-panel actions.',shared:['MeetingDetailPanel']},
+  {id:'my-org',title:'My Org',file:'MyOrg.jsx',route:'/my-org',reads:['C','E','D','L','P'],writes:['D'],agents:['org-title-mapper','org-roster-matcher'],description:'Directory relationships, availability and expert discovery.'},
+  {id:'influence',title:'Influence Map',file:'StakeholderInfluence.jsx',route:'/influence-map',reads:['C','E','W','P'],writes:['W'],agents:['stakeholder-influence-analyst'],description:'Deterministic graph/scores; optional AI stance analysis.'},
+  {id:'milestones',title:'Milestones table',file:'Milestones.jsx',route:'/milestones',reads:['C','E','W','D','L','P'],writes:['W','CRM'],agents:milestoneAgents,description:'Shared milestone details: evidence, comment and HoK.',shared:['DetailCard']},
+  {id:'milestone-map',title:'Milestone Map',file:'Milestones.jsx',route:'/milestone-map',reads:['C','E','W','D','L','P'],writes:['W','CRM'],agents:milestoneAgents,description:'Opportunity-to-milestone hierarchy + shared details.',shared:['DetailCard']},
+  {id:'milestone-timeline',title:'Milestone Timeline',file:'MilestoneTimeline.jsx',route:'/milestone-timeline',reads:['C','E','W','D','L','P'],writes:['W','CRM'],agents:milestoneAgents,description:'Timeline + the same milestone DetailCard actions.',shared:['DetailCard']},
+  {id:'hok',title:'HoK Activities',file:'HokActivities.jsx',route:'/hok-activities',reads:['C','P'],writes:[],agents:[],description:'CRM activity rows, deterministic filters and groupings.'},
+  {id:'consumption',title:'Azure Consumption',file:'Consumption.jsx',route:'/consumption',reads:['C','A','P'],writes:['A'],agents:[],description:'ACR/native XCR rows, snapshots and deterministic insights.'},
+  {id:'account-consumption',title:'Account Consumption',file:'ConsumptionAccount.jsx',route:'/consumption/:tpid',reads:['C','A','P'],writes:['A'],agents:[],description:'Account-scoped ACR and model/service drill-downs.'},
+  {id:'foundry',title:'Foundry Deep-Dives',file:'FoundryDeepDives.jsx',route:'/foundry-deep-dives',reads:['Q','P'],writes:['Q'],agents:[],description:'Usage queries + 15-minute identity-scoped memory cache.'},
+  {id:'quotas',title:'Model Quotas',file:'PowerBIReports.jsx',route:'/powerbi-reports',reads:['C','Q','P'],writes:['Q'],agents:[],description:'Capacity/subscription queries + 60-minute memory cache.'},
+  {id:'deep-research',title:'Deep Research / Work Outputs',file:'DeepResearch.jsx',route:'/deep-research',reads:['C','E','W','L','F','P'],writes:['W','MAIL'],agents:outputAgents,description:'Saved research areas and gaps; explicit Outlook draft.',shared:['WorkOutputsPanel']},
+  {id:'products',title:'Microsoft Products',file:'Products.jsx',route:'/products',reads:['F'],writes:[],agents:[],description:'Bundled product catalog; no live AI or ingestion.'},
+  {id:'solutions',title:'Solutions',file:'Accelerators.jsx',route:'/accelerators',reads:['F'],writes:[],agents:[],description:'Curated reference links and bundled setup guidance.'},
+  {id:'documentation',title:'Documentation',file:'Documentation.jsx',route:'/documentation',reads:['F'],writes:[],agents:[],description:'Bundled in-app documentation; deterministic rendering.'},
+  {id:'settings',title:'User Home',file:'Settings.jsx',route:'/settings',reads:['C','E','W','F','P','L'],writes:['P','F','C','E'],agents:['alias-utility','link-review-utility'],description:'Starts ingestion helpers; roster, models, sync and backups.'},
+  {id:'assistant-ui',title:'Assistant chat',file:'AssistantBubble.jsx',route:'shared',reads:['C','E','W','L','P'],writes:[],agents:['assistant'],description:'Grounded prioritization; bounded conversation memory.'},
+  {id:'tasks-ui',title:'Local Tasks',file:'TaskBubble.jsx',route:'shared',reads:['C','W','P'],writes:['W'],agents:[],description:'Durable local Tasks and workload assignment controls.'},
+  {id:'setup-ui',title:'Setup / tour / model activity',file:'SetupTutorial.jsx',route:'shared',reads:['P','L','F'],writes:['P'],agents:[],description:'Connection checks, model status and local UI preferences.',sources:[UI+'SetupTutorial.jsx',UI+'GuidedTour.jsx',UI+'ModelActivityBanner.jsx',UI+'ErrorBoundary.jsx']},
+];
+const storage = [
+  {id:'store-c',code:'C',title:'C | CRM cache',type:'SQLite',description:'Accounts, opportunities, milestones, HoK, contacts and deal teams.',detail:'Upstream-owned records; active_* views scope reads.',sources:['desktop\\sqlite-ipc.js','desktop\\account-roster.js','desktop\\migrations\\036_active_roster.sql']},
+  {id:'store-e',code:'E',title:'E | M365 evidence',type:'SQLite',description:'Stored email, meetings, Teams, customer links and profile rollups.',detail:'Source coverage/freshness stays explicit.',sources:['tools\\email\\build_profile.py','tools\\meetings\\build_profile.py','tools\\teams\\build_profile.py']},
+  {id:'store-a',code:'A',title:'A | ACR row cache',type:'SQLite',description:'Persistent ACR rows/snapshots, including separately scoped native XCR.',detail:'Not the Foundry token-usage cache.',sources:['desktop\\services\\acr-row-cache.js','desktop\\services\\acr-cache-projection.js']},
+  {id:'store-q',code:'Q',title:'Q | Usage / capacity cache',type:'Memory',description:'Foundry usage: 15 minutes. Capacity queries: 60 minutes.',detail:'Identity-aware; not durable SQLite usage rows.',sources:['desktop\\services\\foundry-usage.js','desktop\\services\\capacity-query.js']},
+  {id:'store-d',code:'D',title:'D | Directory cache',type:'SQLite',description:'org_people, manager/report relationships and retrieved specialists.',detail:'Live directory reads write through locally.',sources:[IPC,'desktop\\migrations\\012_org_people_cache.sql']},
+  {id:'store-l',code:'L',title:'L | Live result buffers',type:'Memory',description:'Original mail, docs, schedules, public pages, Seismic and UI/job responses.',detail:'Selected evidence can be saved to W; not blanket ingestion.',sources:[IPC,'desktop\\services\\work-agent-tools.js','desktop\\services\\public-web-page.js','desktop\\services\\seismic-service.js']},
+  {id:'store-w',code:'W',title:'W | Authored local work',type:'SQLite',description:'Workloads, Tasks, notes/transcripts, links, dismissals, outputs and corrections.',detail:'Durable across sync and off-roster archiving.',sources:['desktop\\services\\customer-tasks.js','desktop\\services\\meeting-tasks.js','desktop\\services\\work-outputs.js','desktop\\services\\stakeholder-influence.js']},
+  {id:'store-f',code:'F',title:'F | Reference / artifact files',type:'Files',description:'Bundled catalog/guides, vault dossiers, generated HTML and DB backups.',detail:'Reference inputs and explicitly generated artifacts.',sources:['src\\frontend\\src\\lib\\microsoftProducts.js','desktop\\services\\research-dossier.js','desktop\\services\\html-render.js','desktop\\services\\db-backup.js']},
+  {id:'store-p',code:'P',title:'P | Roster / preferences',type:'SQLite + files / UI prefs',description:'Saved TPIDs and SSP profile; app-prefs model choices; browser UI preferences.',detail:'Not a renderer-visible secret/token store.',sources:['desktop\\account-roster.js','desktop\\services\\app-prefs.js','src\\frontend\\src\\lib\\navPrefs.js']},
+];
+const components = [
+  {id:'crm-read-api',title:'API | Dynamics / MSX reads',tier:'ext',x:56,y:210,w:560,h:168,region:'inbound',protocol:'api',operation:'read',connection:'dynamics',description:'Authenticated REST / OData GET. Accounts, opportunities, milestones, activities and account teams.',steps:['Explicit paging and selected TPID scope.','Same connection is repeated below for mutations.'],agents:[],sources:['desktop\\msx-ipc.js','src\\frontend\\src\\lib\\sync.js','src\\frontend\\src\\lib\\hokActivities.js']},
+  {id:'m365-read-mcp',title:'MCP | WorkIQ ingestion reads',tier:'ext',x:680,y:210,w:560,h:168,region:'inbound',protocol:'mcp',operation:'read',connection:'workiq',description:'Local stdio MCP: Graph fetch/retrieve for Outlook, calendar and Teams.',steps:['Per-account email + bounded calendar/chat pulls.','Same WorkIQ connection also supports live reads.'],agents:[],sources:['desktop\\services\\workiq-client.js','desktop\\services\\m365-ingest.js']},
+  {id:'analytics-read-api',title:'API | Power BI / MSX-I queries',tier:'ext',x:1304,y:210,w:560,h:168,region:'inbound',protocol:'api',operation:'read',connection:'powerbi',description:'REST querydata / DAX: ACR, native Anthropic XCR, capacity and Foundry token usage.',steps:['Query POST retrieves data; it does not edit the model.','Power BI semantic models are not LLM agents.'],agents:[],sources:['desktop\\services\\acr-querydata.js','desktop\\services\\capacity-query.js','desktop\\services\\foundry-usage.js']},
+  {id:'live-workiq-mcp',title:'WorkIQ MCP | live reads',tier:'ext',x:1928,y:210,w:268,h:78,region:'inbound',classes:'connector',protocol:'mcp',operation:'read',connection:'workiq',description:'Directory, docs, schedules and transcripts.',agents:[],compact:true,sources:['desktop\\services\\workiq-client.js',IPC,'desktop\\services\\meeting-transcript.js']},
+  {id:'public-search-mcp',title:'Public-search MCP',tier:'ext',x:2220,y:210,w:268,h:78,region:'inbound',classes:'connector',protocol:'mcp',operation:'read',connection:'public-search',description:'Copilot read-only web search.',agents:[],compact:true,sources:['desktop\\services\\work-agent-web.js']},
+  {id:'publisher-https',title:'HTTPS | publisher pages',tier:'ext',x:1928,y:304,w:268,h:78,region:'inbound',classes:'connector',protocol:'https',operation:'read',connection:'publishers',description:'Public pages; no user cookies.',agents:[],compact:true,sources:['desktop\\services\\public-web-page.js']},
+  {id:'seismic-browser',title:'Browser | Seismic',tier:'ext',x:2220,y:304,w:268,h:78,region:'inbound',classes:'connector',protocol:'browser',operation:'read',connection:'seismic',description:'Persistent DocCenter browser session.',agents:[],compact:true,sources:['desktop\\services\\seismic-service.js','desktop\\seismic-ipc.js']},
+  {id:'local-input',title:'Local input | user work + reference',tier:'ext',x:2552,y:210,w:584,h:168,region:'inbound',protocol:'local',operation:'input',description:'User-authored Tasks, notes, links, corrections and configuration; bundled guides and dossier files.',steps:['Local work is not replaced by source refreshes.','Backups and report files are explicit local actions.'],agents:[],sources:['desktop\\services\\customer-tasks.js','desktop\\services\\db-backup.js','desktop\\services\\research-dossier.js']},
+  {id:'crm-process',title:'Scope, page & upsert CRM',tier:'flow',x:56,y:506,w:560,h:282,region:'processing',description:'Deterministic sync; no interpretation model.',steps:['Resolve active accounts from saved User Home TPIDs.','Page OData and normalize stable source identifiers.','Upsert CRM rows and preserve authored local history.','Project metrics, dates and joins in code.'],agents:[],sources:['src\\frontend\\src\\lib\\sync.js','src\\frontend\\src\\lib\\msxAutoSync.js','desktop\\account-roster.js','desktop\\services\\customer-insights.js']},
+  {id:'m365-normalize',title:'Stage, normalize & redact',tier:'flow',x:680,y:506,w:560,h:112,region:'processing',description:'WorkIQ → transient JSON → Python normalization/redaction.',agents:[],sources:['desktop\\services\\m365-ingest.js','tools\\email\\ingest_emails.py','tools\\meetings\\ingest_meetings.py','tools\\teams\\ingest_chats.py','tools\\teams\\ingest_messages.py','tools\\common\\identity.py']},
+  {id:'m365-link',title:'Link, review & build profiles',tier:'flow',x:680,y:650,w:560,h:164,region:'processing',description:'Exact links/rollups; two non-catalog Python AI helpers.',agents:['alias-utility','link-review-utility'],note:'AI failure: explicit degraded baseline, not another provider.',sources:['tools\\common\\linking.py','tools\\common\\ai_classify.py','tools\\teams\\ai_aliases.py','tools\\email\\build_profile.py','tools\\meetings\\build_profile.py','tools\\teams\\build_profile.py']},
+  {id:'analytics-process',title:'Query, project & cache analytics',tier:'flow',x:1304,y:506,w:560,h:282,region:'processing',description:'Typed projections, calculations, request coordination and freshness; no LLM analysis on these charts.',steps:['ACR/native XCR rows → persistent row cache / snapshots.','Foundry token usage → identity-scoped 15-minute memory.','Capacity/quota queries → identity-aware 60-minute memory.','Keep scope, units, source and cache age explicit.'],agents:[],sources:['desktop\\services\\acr-querydata.js','desktop\\services\\acr-cache-projection.js','desktop\\services\\acr-insights.js','desktop\\services\\foundry-usage.js','desktop\\services\\capacity-query.js']},
+  {id:'live-process',title:'Resolve live evidence & directory',tier:'flow',x:1928,y:506,w:560,h:282,region:'processing',description:'On demand, not an automatic batch-ingestion stage.',steps:['Validate scope, retrieved IDs and quoted evidence.','Directory → D; other live responses → L.','Meeting transcripts / selected saved evidence → W.'],agents:['work-agent'],note:'Work Agent: registered investigation + six read-only tools; no current page caller. Ordinary live reads need no app agent.',sources:[IPC,'desktop\\services\\meeting-transcript.js','desktop\\services\\work-agent-tools.js','desktop\\services\\work-agent-web.js','desktop\\services\\public-web-page.js']},
+  {id:'local-process',title:'Validate local work & load files',tier:'flow',x:2552,y:506,w:584,h:282,region:'processing',description:'Deterministic persistence, filesystem and configuration operations.',steps:['Validate account-bound writes and required parents.','Save user work without deleting it during sync/archive.','Read bundled catalog/guides and local dossiers.','Generate reports / backup SQLite only on explicit action.'],agents:[],sources:['desktop\\account-roster.js','desktop\\services\\customer-tasks.js','desktop\\services\\signal-links.js','desktop\\services\\html-render.js','desktop\\services\\db-backup.js']},
+  {id:'local-execution',title:'Local execution | validated persistence',tier:'action',x:56,y:2574,w:640,h:208,region:'actions',operation:'local-write',description:'Writes W / P / F, and feature-owned caches where applicable.',steps:['Tasks, workloads, notes, links, corrections and outputs.','Roster/model/UI settings; report files and backups.','Generated text is not permission for an external write.'],agents:[],sources:['desktop\\services\\customer-tasks.js','desktop\\services\\meeting-tasks.js','desktop\\services\\work-outputs.js','desktop\\account-roster.js']},
+  {id:'crm-write-api',title:'API | Dynamics / MSX mutations',tier:'action',x:728,y:2574,w:800,h:208,region:'actions',protocol:'api',operation:'external-write',connection:'dynamics',description:'Explicit user-approved POST / PATCH to the CRM source. Same Dynamics connection as the inbound API card.',steps:['Create/update milestones, deal teams, comments and HoK tasks.','Parent opportunity must be selected before a milestone.','Mirror successful updates to C; surface failures. AI only drafts.'],agents:[],sources:['src\\frontend\\src\\hooks\\useTeamApi.js','desktop\\msx-ipc.js',IPC]},
+  {id:'mail-write-mcp',title:'MCP | WorkIQ mailbox draft action',tier:'action',x:1560,y:2574,w:800,h:208,region:'actions',protocol:'mcp',operation:'external-write',connection:'workiq',description:'Work Outputs → explicit Outlook action → WorkIQ do_action → Graph createReplyAll. Same WorkIQ connection as the read cards.',steps:['Creates a threaded reply-all DRAFT in the user mailbox.','Returns the Outlook link; the user reviews and sends manually.','Never sends mail. Outside the six Work Agent research tools.'],agents:[],sources:[UI+'WorkOutputsPanel.jsx','desktop\\services\\work-outputs.js',IPC,'desktop\\services\\workiq-client.js']},
+  {id:'model-inference-api',title:'API | Model inference, NOT source edits',tier:'ai',x:2392,y:2574,w:744,h:208,region:'actions',protocol:'api',operation:'inference',connection:'models',description:'All listed agents/helpers → shared scheduler → Copilot REST, or an eligible configured Foundry deployment.',steps:['Primary / Utility / pinned Luna model contract stays explicit.','Bounded grounding leaves the device for remote inference.','No silent provider/model switch; not a CRM or mailbox write.'],agents:[],agentNote:'No independent agent; Model: each caller contract (Primary / Utility / Luna).',sources:['desktop\\services\\model-request-scheduler.js','desktop\\services\\copilot-provider.js','desktop\\services\\agents\\runtime.js','desktop\\services\\m365-ingest.js',IPC]},
+];
+const flowOutputs = [
+  {from:'crm-process',to:'C',label:'upsert CRM',frac:.5},
+  {from:'m365-link',to:'E',label:'evidence + profiles',frac:.5},
+  {from:'analytics-process',to:'A',label:'durable rows',frac:.2},
+  {from:'analytics-process',to:'Q',label:'TTL only',frac:.8},
+  {from:'live-process',to:'D',label:'write-through',frac:.2},
+  {from:'live-process',to:'L',label:'transient',frac:.8},
+  {from:'live-process',to:'W',label:'transcripts',frac:.95},
+  {from:'local-process',to:'W',label:'save local work',frac:.15},
+  {from:'local-process',to:'F',label:'files',frac:.5},
+  {from:'local-process',to:'P',label:'settings',frac:.85},
+];
+const readSets = pageGroups.map(group => ({group:group.id,codes:storage.map(store=>store.code).filter(code=>group.pages.some(id=>pages.find(page=>page.id===id).reads.includes(code)))}));
+// DATA END
+const stage = document.getElementById('stage');
+const svg = document.getElementById('wires');
+const nodeRoot = document.getElementById('nodes');
+const SVGNS = 'http://www.w3.org/2000/svg';
+const agentById = new Map([...agents,...helpers].map(agent=>[agent.id,agent]));
+const storeByCode = new Map(storage.map(store=>[store.code,store]));
+const routes = [];
+
+function textElement(tag,className,text) {
+  const element=document.createElement(tag);
+  if(className) element.className=className;
+  element.textContent=text;
+  return element;
+}
+function modelLabel(agent) {
+  const role=agent.pin?'Luna':agent.role==='utility'?'Utility':'Primary';
+  return `${role}${agent.reasoning?'/'+agent.reasoning:''}${agent.copilotOnly?'*':''}`;
+}
+function agentList(component) {
+  const list=textElement('div','agent-list','');
+  if(!component.agents.length) {
+    list.append(textElement('p','no-agent',component.agentNote || (component.compact?'App agent: none | Model: n/a':'Agents: none | Model: n/a | Deterministic code / access.')));
+    return list;
+  }
+  const header=textElement('div','agent-header','');
+  for(const label of ['Agent / helper','Model','Action']) header.append(textElement('span','',label));
+  list.append(header);
+  for(const id of component.agents) {
+    const agent=agentById.get(id);
+    if(!agent) throw new Error(`Unknown agent: ${id}`);
+    const row=textElement('div',`agent-row${agent.hidden?' hidden-agent':''}`,'');
+    row.dataset.agent=id;
+    row.dataset.kind=agent.kind || 'catalog';
+    row.dataset.modelRole=agent.role;
+    if(agent.pin) row.dataset.modelPin=agent.pin;
+    row.dataset.reasoning=agent.reasoning || '';
+    row.append(textElement('span','agent-name',agent.name),textElement('span','model',modelLabel(agent)),textElement('span','agent-action',agent.action));
+    row.title=`${agent.id}; ${agent.kind || 'catalog agent'}; ${agent.hidden?'UI hidden; ':''}${agent.registeredOnly?'registered, no current page caller; ':''}${agent.pin || agent.role}${agent.reasoning?' / '+agent.reasoning:''}${agent.copilotOnly?'; Copilot-only':''}`;
+    list.append(row);
+  }
+  return list;
+}
+function node(component) {
+  const element=textElement('article',`n t-${component.tier} ${component.classes || ''}`,'');
+  element.id=component.id;
+  if(component.region) element.dataset.region=component.region;
+  if(component.protocol) element.dataset.protocol=component.protocol;
+  if(component.operation) element.dataset.operation=component.operation;
+  if(component.connection) element.dataset.connection=component.connection;
+  Object.assign(element.style,{left:`${component.x}px`,top:`${component.y}px`,width:`${component.w}px`});
+  if(component.h) element.style.height=`${component.h}px`;
+  element.append(textElement('h3','',component.title));
+  if(component.description) element.append(textElement('p','sub',component.description));
+  if(component.steps) {
+    const steps=textElement('ul','steps','');
+    component.steps.forEach(step=>steps.append(textElement('li','',step)));
+    element.append(steps);
+  }
+  if(component.reads) {
+    const reads=textElement('div','read-set','');
+    reads.append(textElement('span','','Reads'));
+    for(const code of component.reads) {
+      const store=storeByCode.get(code);
+      if(!store) throw new Error(`Unknown storage domain: ${code}`);
+      const button=textElement('button','store-ref',code);
+      button.type='button';
+      button.dataset.store=code;
+      button.setAttribute('aria-label',`Trace ${store.title}`);
+      button.title=`${store.title} (${store.type})`;
+      button.addEventListener('click',()=>setFocus(code));
+      reads.append(button);
+    }
+    element.append(reads);
+    element.append(textElement('p','writes',`Writes: ${component.writes.length?component.writes.join(' / '):'none (read-only feature)'}`));
+  }
+  element.append(agentList(component));
+  if(component.note) element.append(textElement('p','note',component.note));
+  nodeRoot.append(element);
+  return element;
+}
+function indexEntry(containerId,title,note,sources) {
+  const entry=textElement('div','source-entry','');
+  entry.append(textElement('b','',title),textElement('p','',note));
+  [...new Set(sources)].forEach(source=>entry.append(textElement('code','',source)));
+  document.getElementById(containerId).append(entry);
+}
+function sourceFiles(page) {
+  const shared=(page.shared || []).flatMap(name=>{
+    if(name==='MeetingDetailPanel') return [UI+'MeetingDetailPanel.jsx'];
+    if(name==='WorkloadsWorkspace') return [UI+'WorkloadManagement.jsx'];
+    if(name==='AgendaView') return [UI+'Agenda.jsx'];
+    if(name==='DetailCard') return [UI+'Milestones.jsx'];
+    if(name==='WorkOutputsPanel') return [UI+'WorkOutputsPanel.jsx'];
+    if(name==='SecretarySection (hidden)') return [UI+'SecretarySection.jsx'];
+    throw new Error(`Unknown shared component: ${name}`);
+  });
+  return [...(page.sources || [UI+page.file]),...shared];
+}
+components.forEach(component=>{
+  node(component);
+  indexEntry('component-index',component.title,`${component.description} ${(component.steps || []).join(' ')} ${component.note || ''}`,component.sources);
+});
+storage.forEach((store,index)=>{
+  const component={...store,tier:'data',classes:'store',region:'stores',x:56+index*344,y:940,w:320,h:190,agents:[],description:`${store.type}: ${store.description}`,note:store.detail};
+  const element=node(component);
+  element.dataset.store=store.code;
+  element.setAttribute('role','button');
+  element.setAttribute('tabindex','0');
+  element.setAttribute('aria-pressed','false');
+  element.setAttribute('aria-label',`Trace UI reads from ${store.title}`);
+  element.addEventListener('click',()=>setFocus(document.getElementById('storage-focus').value===store.code?'':store.code));
+  element.addEventListener('keydown',event=>{
+    if(event.key==='Enter' || event.key===' ') { event.preventDefault(); element.click(); }
+  });
+  const option=textElement('option','',`${store.code} - ${store.title.split(' | ')[1]} (${store.type})`);
+  option.value=store.code;
+  document.getElementById('storage-focus').append(option);
+  indexEntry('component-index',store.title,`${store.type}. ${store.description} ${store.detail}`,store.sources);
+});
+pageGroups.forEach((group,index)=>{
+  const x=52+index*516;
+  const zone=textElement('section','zone ui-group','');
+  zone.id=group.id;
+  Object.assign(zone.style,{left:`${x}px`,top:'1452px',width:'500px',height:'1050px'});
+  zone.append(textElement('h2','zh',group.title));
+  nodeRoot.before(zone);
+  let y=1502;
+  for(const id of group.pages) {
+    const page=pages.find(candidate=>candidate.id===id);
+    if(!page) throw new Error(`Unknown page: ${id}`);
+    const element=node({...page,tier:'ui',region:group.id,x:x+16,y,w:468,classes:page.route==='shared'?'shared':''});
+    element.dataset.route=page.route;
+    y+=element.offsetHeight+16;
+    indexEntry('page-index',page.title,`${page.route==='shared'?'Shared renderer component':'Route: '+page.route}. Reads ${page.reads.join(', ')}; writes ${page.writes.join(', ') || 'none'}. ${page.description} ${page.shared?'Embedded: '+page.shared.join(', ')+'.':''}`,sourceFiles(page));
+  }
+});
+for(const agent of [...agents,...helpers]) {
+  const hosts=[...pages,...components].filter(component=>component.agents.includes(agent.id)).map(component=>component.title);
+  indexEntry('agent-index',`${agent.name} (${agent.id})`,`${agent.kind || 'Catalog agent'}. Model: ${agent.pin || agent.role}${agent.reasoning?' / '+agent.reasoning:''}. ${agent.copilotOnly?'Copilot-only. ':''}${agent.hidden?'UI hidden. ':''}${agent.registeredOnly?'Registered, no current page caller. ':''}Action: ${agent.action}. Invoked by: ${hosts.join('; ')}.`,agent.sources || [CATALOG,'desktop\\services\\agents\\runtime.js',IPC]);
+}
+
+const colors={flow:'#2f6fd0',read:'#138876',action:'#a86c20',ai:'#6a5cd6'};
+const defs=document.createElementNS(SVGNS,'defs');
+for(const [kind,color] of Object.entries(colors)) {
+  const marker=document.createElementNS(SVGNS,'marker');
+  for(const [key,value] of Object.entries({id:`arrow-${kind}`,markerWidth:8,markerHeight:8,refX:6,refY:3,orient:'auto'})) marker.setAttribute(key,value);
+  const path=document.createElementNS(SVGNS,'path');
+  path.setAttribute('d','M0,0 L6,3 L0,6 Z');
+  path.setAttribute('fill',color);
+  marker.append(path);
+  defs.append(marker);
+}
+svg.append(defs);
+function box(id) {
+  const element=document.getElementById(id);
+  if(!element) throw new Error(`Unknown geometry target: ${id}`);
+  return {l:element.offsetLeft,t:element.offsetTop,r:element.offsetLeft+element.offsetWidth,b:element.offsetTop+element.offsetHeight,w:element.offsetWidth,h:element.offsetHeight,cx:element.offsetLeft+element.offsetWidth/2,cy:element.offsetTop+element.offsetHeight/2};
+}
+function pt(id,side,frac=.5) {
+  const b=box(id);
+  if(side==='r') return {x:b.r,y:b.t+b.h*frac};
+  if(side==='l') return {x:b.l,y:b.t+b.h*frac};
+  return {x:b.l+b.w*frac,y:side==='t'?b.t:b.b};
+}
+function ortho(points,r=6) {
+  const clean=points.filter((p,index)=>!index || Math.hypot(p.x-points[index-1].x,p.y-points[index-1].y)>.01);
+  let d=`M ${clean[0].x} ${clean[0].y}`;
+  for(let i=1;i<clean.length-1;i++) {
+    const p=clean[i],a=clean[i-1],b=clean[i+1];
+    const d1={x:Math.sign(p.x-a.x),y:Math.sign(p.y-a.y)},d2={x:Math.sign(b.x-p.x),y:Math.sign(b.y-p.y)};
+    const rr=Math.min(r,Math.hypot(p.x-a.x,p.y-a.y)/2,Math.hypot(b.x-p.x,b.y-p.y)/2);
+    d+=` L ${p.x-d1.x*rr} ${p.y-d1.y*rr} Q ${p.x} ${p.y} ${p.x+d2.x*rr} ${p.y+d2.y*rr}`;
+  }
+  const e=clean.at(-1);
+  return `${d} L ${e.x} ${e.y}`;
+}
+function line(points,{id,kind='flow',arrow=true,bank='',from='',to=''}={}) {
+  const path=document.createElementNS(SVGNS,'path');
+  path.setAttribute('d',ortho(points));
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke',colors[kind]);
+  path.setAttribute('stroke-width',kind==='read'?'1.5':'2');
+  if(arrow) path.setAttribute('marker-end',`url(#arrow-${kind})`);
+  path.dataset.route=id;
+  if(bank) { path.classList.add('readflow'); path.dataset.bank=bank; }
+  svg.append(path);
+  routes.push({id,points,kind,arrow,bank,from,to});
+}
+function tag(x,y,text,bank='') {
+  const element=textElement('div',`elabel${bank?' read-label readflow':''}`,text);
+  Object.assign(element.style,{left:`${x}px`,top:`${y}px`});
+  if(bank) element.dataset.bank=bank;
+  stage.append(element);
+}
+function connect(from,to,{viaY,label,kind='flow',fromFrac=.5,toFrac=.5,id=`${from}-${to}`}={}) {
+  const a=pt(from,'b',fromFrac),b=pt(to,'t',toFrac);
+  line(viaY===undefined?[a,b]:[a,{x:a.x,y:viaY},{x:b.x,y:viaY},b],{id,kind,from,to});
+  if(label) tag((a.x+b.x)/2,viaY ?? (a.y+b.y)/2,label);
+}
+function setFocus(code) {
+  if(code && !storeByCode.has(code)) throw new Error(`Unknown storage focus: ${code}`);
+  document.getElementById('storage-focus').value=code;
+  for(const element of stage.querySelectorAll('.readflow')) {
+    element.classList.toggle('muted',!!code && element.dataset.bank!==code);
+    element.classList.toggle('focused',!!code && element.dataset.bank===code);
+  }
+  for(const page of pages) document.getElementById(page.id).classList.toggle('dimmed',!!code && !page.reads.includes(code));
+  for(const store of storage) document.getElementById(store.id).setAttribute('aria-pressed',String(store.code===code));
+}
+document.getElementById('storage-focus').addEventListener('change',event=>setFocus(event.target.value));
+let actualSize=false;
+function fit() {
+  const scroller=document.getElementById('diagram-scroll');
+  const viewport=document.getElementById('viewport');
+  const scale=actualSize?1:Math.min(1,scroller.clientWidth/WIDTH);
+  Object.assign(viewport.style,{width:`${WIDTH*scale}px`,height:`${HEIGHT*scale}px`});
+  stage.style.transform=`scale(${scale})`;
+  document.getElementById('fit').setAttribute('aria-pressed',String(!actualSize));
+  document.getElementById('actual').setAttribute('aria-pressed',String(actualSize));
+  document.getElementById('zoom-status').textContent=`${Math.round(scale*100)}%${actualSize?' - scroll to pan':''}`;
+}
+document.getElementById('fit').addEventListener('click',()=>{actualSize=false;fit();});
+document.getElementById('actual').addEventListener('click',()=>{actualSize=true;fit();});
+window.addEventListener('resize',fit);
+document.getElementById('reference').addEventListener('toggle',fit);
+fit();
+
+requestAnimationFrame(()=>{
+  connect('crm-read-api','crm-process',{label:'GET records'});
+  connect('m365-read-mcp','m365-normalize',{label:'fetch source items'});
+  connect('analytics-read-api','analytics-process',{label:'query result rows'});
+  connect('local-input','local-process',{label:'validated local inputs'});
+  connect('m365-normalize','m365-link',{label:'normalized items'});
+  const liveTop=pt('live-process','t');
+  line([pt('live-read-connections','b'),liveTop],{id:'live-read-collection',from:'live-read-connections',to:'live-process'});
+  tag(liveTop.x,446,'on-demand read results');
+  flowOutputs.forEach((output,index)=>{
+    const store=storeByCode.get(output.to);
+    connect(output.from,store.id,{viaY:826+index*10,fromFrac:output.frac,id:`process-${output.from}-${output.to.toLowerCase()}`});
+    if(flowOutputs.findIndex(candidate=>candidate.to===output.to)===index) {
+      tag(pt(store.id,'t').x,926,flowOutputs.filter(candidate=>candidate.to===output.to).map(candidate=>candidate.label).join(' / '));
+    }
+  });
+  storage.forEach((store,index)=>{
+    const source=pt(store.id,'b'),y=1172+index*24;
+    const taps=readSets.filter(read=>read.codes.includes(store.code)).map(read=>({group:read.group,x:box(read.group).l+34+index*48}));
+    if(!taps.length) throw new Error(`Unreferenced storage domain: ${store.code}`);
+    const xs=[source.x,...taps.map(tap=>tap.x)];
+    line([source,{x:source.x,y}],{id:`read-${store.code}-feed`,kind:'read',arrow:false,bank:store.code,from:store.id});
+    line([{x:Math.min(...xs),y},{x:Math.max(...xs),y}],{id:`read-${store.code}-rail`,kind:'read',arrow:false,bank:store.code,from:store.id});
+    tag(source.x,y,`${store.code} | ${store.title.split(' | ')[1]}`,store.code);
+    for(const tap of taps) {
+      const target={x:tap.x,y:box(tap.group).t};
+      line([{x:tap.x,y},target],{id:`read-${store.code}-${tap.group}`,kind:'read',bank:store.code,from:store.id,to:tap.group});
+      tag(target.x,1432,store.code,store.code);
+    }
+  });
+  connect('ui-daily-work','local-execution',{kind:'action',viaY:2522,fromFrac:.3,label:'save local work'});
+  connect('ui-milestones','crm-write-api',{kind:'action',viaY:2522,label:'approve CRM change'});
+  connect('ui-research','mail-write-mcp',{kind:'action',viaY:2522,label:'create Outlook draft'});
+  connect('ui-workspace','model-inference-api',{kind:'ai',viaY:2522,label:'all AI → scheduler → API'});
+  const daily=pt('ui-daily-work','b',.9),crm=pt('crm-write-api','t',.2);
+  line([daily,{x:daily.x,y:2510},{x:710,y:2510},{x:710,y:2538},{x:crm.x,y:2538},crm],{id:'daily-crm-action',kind:'action',from:'ui-daily-work',to:'crm-write-api'});
+  window.architecture={view:'components',layout:'data-workflow',width:WIDTH,height:HEIGHT,revision:'c2ff468',agents,helpers,pages,pageGroups,storage,components,flowOutputs,readSets,routes};
+  stage.dataset.ready='true';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,211 @@
+// Guided-tour step definitions — a spotlight walkthrough of the app's most valuable actions.
+// The GuidedTour component navigates to each step's `page`, waits for `target` to appear, spot-
+// lights it (deep-darkened backdrop with a cutout), and shows the direction card. Steps advance
+// with the Next arrow; steps flagged `clickAdvances` ALSO advance when the user clicks the
+// highlighted element (so doing the real action moves the tour forward). `loading` steps show a
+// "give it a moment" note for surfaces that pull + cache data on first open.
+//
+// Selectors intentionally target stable, already-present hooks (nav links by href, and a few
+// long-lived class names). If a target isn't found (e.g. a page has no data yet), the tour falls
+// back to a centered card so a missing element never breaks the walkthrough.
+
+export const TOUR_STEPS = [
+  {
+    id: 'welcome',
+    page: '/action-center',
+    target: null,
+    placement: 'center',
+    title: 'Welcome — here’s the 90-second tour',
+    body: 'We’ll hop to each key area, spotlight what matters, and tell you what it does. Use the arrow to advance, or click a highlighted control to do it yourself. You can close anytime.',
+  },
+  {
+    id: 'action-center',
+    page: '/action-center',
+    target: '.ac-top-left',
+    placement: 'right',
+    subTargets: ['.ac-daynav', '.ac-cal-event', '.ac-cal-join'],
+    title: 'Action Center — your daily home',
+    body: 'Start here each day: today’s meetings sit top-left, your milestone health is on the right, and active workloads are below. The calendar collapses empty gaps and shows overlaps side by side:',
+    bullets: [
+      { label: 'Day navigation', text: 'step back or ahead to any day, or jump to Today.' },
+      { label: 'A meeting', text: 'click any meeting to open its full details.' },
+      { label: 'Join', text: 'online meetings show a one-click Join badge.' },
+    ],
+  },
+  {
+    id: 'ac-meeting-detail',
+    page: '/action-center',
+    target: '[data-tour="mtg-panel"]',
+    placement: 'left',
+    narrow: true,
+    openMeetingFirst: true,
+    subTargets: ['[data-tour="mtg-prepare"]', '[data-tour="mtg-transcript"]', '[data-tour="mtg-tasks"]', '[data-tour="mtg-link"]'],
+    title: 'The meeting workspace',
+    body: 'Everything you need before, during, and after a meeting lives here:',
+    bullets: [
+      { label: 'Prepare', text: 'AI writes a briefing from the account’s recent emails, meetings, and chats.' },
+      { label: 'Fetch from Teams', text: 'fetches the transcript, summarizes clear to-do items, then creates SE Assist Tasks.' },
+      { label: 'Tasks + Copy', text: 'search customer and workload assignments for each Task, or copy any note section with its copy icon.' },
+      { label: 'Linked milestones + Ask in Teams', text: 'link this meeting to a milestone, or message the SSP to ask which one.' },
+    ],
+  },
+  {
+    id: 'ac-health',
+    page: '/action-center',
+    target: '.ac-top-right',
+    placement: 'left',
+    closePopups: true,
+    subTargets: ['[data-tour="ac-overdue"]', '[data-tour="ac-blocked"]', '[data-tour="ac-due"]'],
+    title: 'Your milestone health',
+    body: 'Your deal teams’ health at a glance — each tile opens a pre-filtered Milestones list:',
+    bullets: [
+      { label: 'Overdue comments', text: 'milestones you own that are past due for a status note.' },
+      { label: 'Blocked milestones', text: 'anything currently flagged Blocked.' },
+      { label: 'Milestones due or overdue', text: 'active, uncommitted milestones — the date turns red when late.' },
+    ],
+  },
+  {
+    id: 'ac-workloads',
+    page: '/action-center',
+    target: '.ac-wl-reader',
+    placement: 'top',
+    narrow: true,
+    title: 'Active workloads',
+    body: 'A workload is one SE effort — it can span several opportunities and milestones for an account. Pick one on the left to see its account, SSP, and milestones (grouped by opportunity) on the right, then open it to run Milestone AI or link comms.',
+  },
+  {
+    id: 'ac-workload-ai',
+    page: '/action-center',
+    target: '.wl-modal-card',
+    placement: 'left',
+    narrow: true,
+    openWorkloadFirst: true,
+    subTargets: ['[data-tour="wl-ai-buttons"]'],
+    title: 'Inside a workload',
+    body: 'A workload gathers an account’s milestones (grouped by opportunity) with its overview and linked comms. The one action to know:',
+    bullets: [
+      { label: 'Milestone AI', text: 'works every milestone in one pass — links new related emails, meetings, and chats (never overwriting), then drafts a comment and suggested Hands-on-Keyboard activities to review. Also on each milestone’s own popup.' },
+    ],
+  },
+  {
+    id: 'ac-suggest-workloads',
+    page: '/action-center',
+    target: '#ac-workloads',
+    placement: 'left',
+    cardAnchor: 'top-right',
+    expandWorkloadsSection: true,
+    subTargets: ['[data-tour="wl-new"]', '[data-tour="suggest-workloads"]'],
+    title: 'Build or discover workloads',
+    body: 'The Workloads section is where workloads start — two ways in:',
+    bullets: [
+      { label: 'New workload', text: 'create one by hand and attach its account, opportunities, and milestones.' },
+      { label: 'Suggest workloads', text: 'AI reads the last 4 weeks of emails, meetings, and chats and proposes brand-new workloads — each with a title, description, and customer. Approve one to make it real.' },
+    ],
+  },
+  {
+    id: 'customers',
+    page: '/email',
+    target: '.ca-card',
+    placement: 'bottom',
+    title: 'Customers — recent activity per account',
+    body: 'One card per account, grouped by SSP, showing recent emails, meetings, and chats and who’s gone quiet. Click any account to open a fast “glance” popup.',
+  },
+  {
+    id: 'customer-glance',
+    page: '/email',
+    target: '.ca-modal',
+    placement: 'left',
+    narrow: true,
+    openGlanceFirst: true,
+    title: 'The account glance popup',
+    body: 'A fast triage view for one account — no full page load needed:',
+    bullets: [
+      { label: 'Pipeline & team', text: 'MSX opportunity and milestone counts, plus the SSP, ATS, and AE.' },
+      { label: 'Workloads & contacts', text: 'the account’s active workloads and key people.' },
+      { label: 'Recent activity', text: 'emails, meetings, and chats at a glance, and who’s gone quiet.' },
+    ],
+  },
+  {
+    id: 'milestones',
+    page: '/milestones',
+    target: '.territory-toggle',
+    placement: 'bottom',
+    clickAdvances: true,
+    title: 'Milestones — scope with one control',
+    body: 'This toggle cycles through three scopes — click it to try, or use the arrow:',
+    bullets: [
+      { label: 'All Milestones', text: 'every milestone across your territory.' },
+      { label: 'My Milestones', text: 'only the ones where you’re on the deal team.' },
+      { label: 'Discover Mode - My SSPs', text: 'active milestones your SSPs own that you haven’t joined yet.' },
+    ],
+  },
+  {
+    id: 'milestone-detail',
+    page: '/milestones',
+    target: '[data-tour="ms-panel"]',
+    placement: 'left',
+    narrow: true,
+    openMilestoneFirst: true,
+    subTargets: ['[data-tour="ms-signal"]', '[data-tour="ms-comments"]', '[data-tour="ms-activities"]', '[data-tour="ms-ai"]'],
+    title: 'Inside a milestone',
+    body: 'Click any milestone to open its details. Everything about it is here:',
+    bullets: [
+      { label: 'Related signals', text: 'the emails, meetings, and chats linked to this milestone.' },
+      { label: 'Recent comments', text: 'the latest status notes logged on it.' },
+      { label: 'Recent activities', text: 'the Hands-on-Keyboard tasks tracked against it.' },
+      { label: 'Milestone AI', text: 'one pass links new signals, drafts a comment, and suggests HoK activities.' },
+    ],
+  },
+  {
+    id: 'consumption',
+    page: '/consumption',
+    target: '.page-header',
+    placement: 'bottom',
+    loading: true,
+    loadingMinutes: '5–7 minutes',
+    // Real load signals the tour watches: while `loadingSelector` is present the pull is running;
+    // once `readySelector` appears the data has loaded (and cached). The indicator reflects this
+    // truthfully rather than showing a fixed spinner.
+    loadingSelector: '[data-acr-loading]',
+    readySelector: '[data-acr-ready]',
+    title: 'Azure Consumption — live, then cached',
+    body: 'This pulls Azure Consumed Revenue from the MSX-I Power BI models the first time you open it, then caches locally so later visits are instant. The very first load can take 5–7 minutes — you can keep touring, but leaving this page cancels the pull, so let it finish here if you want it cached.',
+  },
+  {
+    id: 'consumption-leaderboard',
+    page: '/consumption',
+    target: '[data-tour="acr-leaderboard"]',
+    placement: 'right',
+    narrow: true,
+    title: 'Account leaderboard',
+    body: 'Your accounts ranked by Azure Consumed Revenue, with a trend sparkline and month-over-month change so you can see who’s growing or slipping. Click any account row to open its full consumption breakdown.',
+  },
+  {
+    id: 'hok',
+    page: '/hok-activities',
+    target: '.page-header',
+    placement: 'bottom',
+    title: 'HoK Activities — your delivery worklist',
+    body: 'Every MSX task (Hands-on-Keyboard activity) you own — the day-to-day POC and delivery work. Filter by account or SSP, and open any one for its details.',
+  },
+  {
+    id: 'my-org',
+    page: '/my-org',
+    target: '.page-header',
+    placement: 'bottom',
+    title: 'My Org — the people behind your accounts',
+    body: 'My Org maps who’s connected to your work as two overlaid graphs:',
+    bullets: [
+      { label: 'Internal graph', text: 'your Microsoft network — account-team, milestone and opportunity owners, and colleagues who’ve engaged the account.' },
+      { label: 'External graph', text: 'the customer’s own contacts and how they relate to each other and your team, drawn from real email, meeting, and chat activity.' },
+    ],
+  },
+  {
+    id: 'finish',
+    page: '/action-center',
+    target: '.nav-tour-btn',
+    placement: 'right',
+    title: 'That’s the tour',
+    body: 'Replay this walkthrough anytime from this button. You can hide it in User Home → Customize navigation. Happy selling!',
+  },
+];

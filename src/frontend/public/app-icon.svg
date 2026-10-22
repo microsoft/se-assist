@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 128 128" role="img" aria-label="SE Assist">
+  <rect width="128" height="128" rx="29" fill="#F2C43D"/>
+  <path d="M24 68V44C24 32 32 24 44 24H80V44H48C46 44 44 46 44 48V88Z" fill="#252823" fill-rule="evenodd"/>
+  <path d="M104 60V84C104 96 96 104 84 104H48V84H80C82 84 84 82 84 80V40Z" fill="#68491E" fill-rule="evenodd"/>
+</svg>

@@ -1,0 +1,100 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# SQLite databases and transaction sidecars
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Test caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Azure
+.azure/
+
+# Terraform state
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs.zip
+
+# Deployment artifacts
+*.zip
+
+# Electron
+desktop/node_modules/
+desktop/dist/
+# Vendored embeddable Python runtime (fetched at build time by scripts/fetch-python.js)
+desktop/vendor/
+
+# Frontend
+src/frontend/node_modules/
+
+# Teams datastore: raw chat/message exports (sensitive content) — never commit
+tools/teams/exports/
+!tools/teams/exports/.gitkeep
+
+# Email datastore: raw email exports (sensitive content) — never commit
+tools/email/exports/
+!tools/email/exports/.gitkeep
+
+# Meeting datastore: raw calendar exports (sensitive content) — never commit
+tools/meetings/exports/
+!tools/meetings/exports/.gitkeep
+
+# Runtime/scratch artifacts from unrelated tools & demo apps (may contain personal data)
+.playwright-mcp/
+# Stray root-level screenshots from other projects (personal financial data) — not project assets
+/acct.png
+/advisor-popup.png
+/iv-dashboard.png
+/iv-map.png
+/verify.png
+
+# MSX CLI: cached Entra tokens (contain refresh token) — never commit
+tools/msx/.msx-token-cache.json
+tools/msx/.msx-account.json
+tools/msx/milestone-create-fields.json
+
+# Copilot app-managed worktrees (per-session checkouts) — never commit
+copilot-worktrees/
+
+# Local assistant state and automation
+/.squad/
+/.copilot/
+.squad-workstream
+
+# Local customer/account research and Obsidian data
+/vault/

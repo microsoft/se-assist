@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>SE Assist - solution overview</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --ink:#1d2b47; --dim:#596a80;
+    --app:#2f6fd0; --appbg:#e3edfb; --appedge:#b3cbec;
+    --ai:#6a5cd6; --aibg:#f0edfc; --aiedge:#cdc6ed;
+    --data:#138876; --databg:#e7f4ef; --dataedge:#b4d9cf;
+    --ext:#5b6b86; --extbg:#edf0f6; --extedge:#c7d0df;
+    --chan:#a551b8; --chanbg:#f7edf9; --chanedge:#dec1e5;
+    --obs:#a86c20; --obsbg:#fbf2e5; --obsedge:#e5ceac;
+    --flow:#2f6fd0; --ctrl:#8a97ac; --cardedge:#d6deea;
+  }
+  * { box-sizing:border-box; margin:0; padding:0 }
+  html,body { background:#edf1f7; color:var(--ink); font-family:"Segoe UI",Arial,sans-serif }
+  #viewport { position:relative; height:min(56.25vw,1080px); margin:0 auto; overflow:hidden }
+  #stage {
+    position:absolute; width:1920px; height:1080px; overflow:hidden; transform-origin:top left;
+    -webkit-font-smoothing:antialiased;
+    background:radial-gradient(1900px 1000px at 50% 0,#fff 0,#f5f7fb 65%,#edf1f7 100%);
+  }
+  .h-title { position:absolute; left:28px; top:18px; font-size:28px; font-weight:700; z-index:6 }
+  .h-sub { position:absolute; left:28px; top:58px; font-size:16px; color:var(--dim); z-index:6 }
+  .boundary { position:absolute; left:20px; top:226px; width:1880px; height:620px; border:1px dashed #a8b5c8; border-radius:14px }
+  .boundary-title { position:absolute; left:36px; top:216px; padding:0 7px; background:#f8fafd; font-size:12px; color:var(--dim); font-weight:600; z-index:2 }
+  .zone { position:absolute; border:1px solid; border-radius:12px; z-index:1 }
+  .zh { position:absolute; top:10px; left:15px; font-size:12px; font-weight:700; letter-spacing:.7px }
+  .n {
+    position:absolute; display:flex; flex-direction:column; justify-content:center; gap:4px;
+    padding:5px 16px; background:#fff; border:1px solid var(--cardedge); border-radius:8px; z-index:4;
+  }
+  .n b { font-size:16px; font-weight:600; line-height:1.2; white-space:nowrap }
+  .n .sub { font-size:12px; color:var(--dim); line-height:1.25; white-space:nowrap }
+  .n.hub { background:var(--appbg); border:1.5px solid var(--app); box-shadow:0 0 0 4px rgba(47,111,208,.10); padding:18px 24px; gap:12px; z-index:5 }
+  .n.hub b { font-weight:700 }
+  .n.t-app { border-left:3px solid var(--app) }
+  .n.t-ai { border-left:3px solid var(--ai) }
+  .n.t-data { border-left:3px solid var(--data) }
+  .n.t-ext { border-left:3px solid var(--ext) }
+  .n.t-chan { border-left:3px solid var(--chan) }
+  .n.t-obs { border-left:3px solid var(--obs) }
+  .journeys { position:absolute; left:452px; top:130px; width:1416px; display:grid; grid-template-columns:repeat(3,1fr); gap:30px; z-index:4 }
+  .journey { padding:7px 0 7px 16px; border-left:3px solid var(--appedge) }
+  .journey b { display:block; margin-bottom:9px; font-size:16px; font-weight:600 }
+  .journey p { font-size:12px; line-height:1.5; color:var(--dim) }
+  svg#wires { position:absolute; inset:0; width:1920px; height:1080px; z-index:3; pointer-events:none }
+  .elabel { position:absolute; z-index:4; font-size:12px; line-height:1.1; color:#33425e; background:#fff; border:1px solid #d3dce9; border-radius:6px; padding:3px 6px; transform:translate(-50%,-50%); white-space:nowrap }
+  .legend { position:absolute; right:28px; top:18px; display:flex; flex-direction:column; gap:7px; padding:8px 12px; border:1px solid #d1daea; border-radius:8px; background:#fff; z-index:6 }
+  .legend-row { display:flex; align-items:center; gap:12px; font-size:12px; color:var(--dim) }
+  .key { display:inline-flex; align-items:center; gap:5px }
+  .sw { width:22px; border-top:2px solid var(--flow) }
+  .sw.d { border-top:2px dashed var(--ctrl) }
+  .rail { width:3px; height:13px; background:var(--chan) }
+  .foot { position:absolute; left:36px; top:1056px; font-size:12px; color:var(--dim); z-index:6 }
+  .view-nav { display:flex; flex-wrap:wrap; justify-content:center; gap:10px 24px; margin:20px; font-size:16px }
+  a { color:#245da9 }
+  #reference { max-width:1440px; margin:24px auto; padding:20px; background:#fff; border:1px solid var(--cardedge); border-radius:12px; font-size:16px; line-height:1.5 }
+  #reference summary { font-weight:600; cursor:pointer }
+  #reference p { margin:12px 0 }
+  #reference h2 { font-size:16px; margin:20px 0 8px }
+  #reference ul { padding-left:24px }
+  #reference code { font-size:12px; overflow-wrap:anywhere }
+  .source-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px }
+  .source-entry { padding:12px; border:1px solid var(--cardedge); border-radius:8px }
+  .source-entry p,.source-entry code { display:block; margin:5px 0; font-size:12px }
+  @media print {
+    @page { size:20in 11.25in; margin:0 }
+    html,body { background:white }
+    #viewport { width:1920px !important; height:1080px !important }
+    #stage { transform:none !important }
+    #reference,.view-nav { display:none }
+  }
+</style>
+</head>
+<body>
+<div id="viewport">
+<main id="stage" aria-label="SE Assist solution overview: the SE, six capability groups, local orchestration and data, grounded AI, source categories and three principal workflows">
+  <h1 class="h-title">SE Assist | Solution overview</h1>
+  <p class="h-sub">A local-first SE workspace that combines enterprise evidence with grounded AI to produce reviewable customer work.</p>
+  <div class="legend" aria-label="Diagram legend">
+    <div class="legend-row"><span class="key"><i class="sw"></i> selected call / data path</span><span>Grouped capabilities, not separate services</span></div>
+    <div class="legend-row">
+      <span class="key"><i class="rail"></i> workspace</span>
+      <span class="key"><i class="rail" style="background:var(--app)"></i> application</span>
+      <span class="key"><i class="rail" style="background:var(--ai)"></i> AI</span>
+      <span class="key"><i class="rail" style="background:var(--obs)"></i> actions</span>
+      <span class="key"><i class="rail" style="background:var(--data)"></i> data</span>
+      <span class="key"><i class="rail" style="background:var(--ext)"></i> external</span>
+    </div>
+  </div>
+  <section class="journeys" aria-label="Three principal workflows">
+    <div class="journey"><b>1 Refresh context</b><p>Saved roster &gt; sync / pull &gt; linked evidence<br>Cached and live data are labelled honestly.</p></div>
+    <div class="journey"><b>2 Investigate a question</b><p>Bounded evidence &gt; grounded AI &gt; reviewable output<br>Sources, gaps and model attribution stay visible.</p></div>
+    <div class="journey"><b>3 Apply an explicit action</b><p>Review &gt; local work / CRM edit / Outlook draft<br>Research tools cannot perform those writes.</p></div>
+  </section>
+  <div class="boundary" data-boundary="device"></div>
+  <p class="boundary-title">ONE LOCAL WINDOWS DEVICE</p>
+  <section class="zone" id="visual" style="left:36px;top:248px;width:1848px;height:164px;background:var(--chanbg);border-color:var(--chanedge)">
+    <h2 class="zh" style="color:var(--chan)">SE WORKSPACE | six workflow groups, not six deployed applications</h2>
+  </section>
+  <section class="zone" id="assistance" style="left:36px;top:456px;width:574px;height:230px;background:var(--aibg);border-color:var(--aiedge)">
+    <h2 class="zh" style="color:var(--ai)">ASSISTANCE + USER-CONTROLLED EXECUTION | main-owned code</h2>
+  </section>
+  <section class="zone" id="foundation" style="left:1310px;top:456px;width:574px;height:230px;background:var(--databg);border-color:var(--dataedge)">
+    <h2 class="zh" style="color:var(--data)">LOCAL DATA FOUNDATION | owned by this installation</h2>
+  </section>
+  <section class="zone" id="pipeline" style="left:36px;top:730px;width:1848px;height:104px;background:var(--databg);border-color:var(--dataedge)">
+    <h2 class="zh" style="color:var(--data)">SCOPED DATA ACCESS + PROCESSING</h2>
+  </section>
+  <section class="zone" id="external" style="left:36px;top:926px;width:1848px;height:116px;background:var(--extbg);border-color:var(--extedge)">
+    <h2 class="zh" style="color:var(--ext)">REMOTE SYSTEM CATEGORIES</h2>
+  </section>
+  <svg id="wires" aria-hidden="true"></svg>
+  <div id="nodes"></div>
+  <p class="foot">No shared team database or hosted SE Assist backend. Bounded grounding can leave the device for inference. Research is read-only; email is drafted, never sent.</p>
+</main>
+</div>
+<nav class="view-nav" aria-label="Architecture views">
+  <a href="se-assist-overview.html" aria-current="page">1 Solution overview</a>
+  <a href="se-assist-runtime.html">2 Runtime &amp; trust boundaries</a>
+  <a href="se-assist-components.html">3 Component reference</a>
+  <a href="se-assist-overview.png" download>Download this PNG</a>
+</nav>
+<details id="reference">
+  <summary>Reading guide, architectural contracts, sources and design notes</summary>
+  <p><strong>Use this view to introduce the product.</strong> The Solution Engineer owns an independent Windows installation, database and service connections. The six workspace cards summarize capabilities; they are neither separate deployable services nor the application's exact navigation groups. The component reference retains the individual routed and shared surfaces.</p>
+  <h2>How to read the workflows</h2>
+  <ul>
+    <li><strong>Refresh context:</strong> the saved active TPID roster bounds CRM and M365 collection. Ingested evidence is normalized, redacted, linked and persisted. Account archiving removes active membership without deleting local history.</li>
+    <li><strong>Investigate:</strong> application code gathers bounded local grounding or performs permitted live reads. AI interprets and synthesizes it. Source access, citations, gaps and provider failures are visible rather than silently substituted.</li>
+    <li><strong>Act:</strong> reviewable outputs can become Tasks, workloads or saved research. User-directed CRM mutations and Outlook reply-all draft creation are distinct application actions, not research-tool powers. The application does not send email.</li>
+  </ul>
+  <h2>Important boundaries</h2>
+  <ul>
+    <li>Local-first means local ownership, not that every computation stays on the device. Bounded, feature-specific grounding is sent to a remote model when the user invokes AI.</li>
+    <li>The Electron main process owns privileged integration, model, persistence and execution work. Agent specifications are local code, not autonomous hosted services. The runtime view separates renderers, preloads, main, subprocesses and local storage.</li>
+    <li>All model work, including desktop-launched Python AI, enters the shared model-request scheduler. Connected Copilot is an explicit provider choice; its failure never switches to Foundry. Foundry requires Copilot to be disconnected, complete configuration and feature eligibility.</li>
+    <li>Work Agent, Work Outputs/research, influence analysis and ingestion AI are Copilot-only. Public research sends generic, scrubbed queries; it is not an identity or data-source replacement for enterprise research.</li>
+    <li>Not all remote results go into SQLite. ACR has durable row caches; Foundry Deep-Dives usage has a 15-minute identity-scoped memory cache. Directory, documents and original-email research can be read live.</li>
+    <li>The lines are selected request/data relationships; responses are implicit. Source-category cards summarize independent integrations and do not introduce an API gateway, event bus or cloud application backend.</li>
+  </ul>
+  <h2>Source anchors</h2>
+  <div id="source-index" class="source-grid"></div>
+  <h2>Design notes</h2>
+  <p>1920 x 1080, 16:9. Adapted from the architecture-diagram HTML/SVG template: one orchestration focal point, common-region capability groups, orthogonal single-ended labelled connectors, semantic color rails and three type sizes (28 / 16 / 12). The SE and three journeys establish purpose before implementation. Visualization remains above Electron orchestration, assistance/actions remain to its left, and local state remains to its right.</p>
+  <p>This is view 1 of a three-view set. It deliberately removes filenames, individual agents and page inventories from the slide. The other views explain runtime ownership and implementation detail without mixing those abstraction levels here. No live customer data, credentials or tenant inventory are embedded.</p>
+</details>
+<script>
+const capabilities = [
+  ['daily','Daily work & delivery','Action Center / agenda|Workloads / Excellence Metrics'],
+  ['customers','Customers & relationships','Customer workspaces / My Org|Stakeholder Influence Map'],
+  ['milestones','Milestones & activities','Table / Map / Timeline|HoK Activities'],
+  ['consumption','Consumption & capacity','Azure + account consumption|Foundry Deep-Dives / model quotas'],
+  ['research','Research & resources','Deep Research / Work Outputs|Products / solutions / documentation'],
+  ['workspace','Workspace & shared UI','User Home / setup / connections|Assistant chat / local Tasks'],
+];
+const nodes = [
+  {id:'se',title:'Solution Engineer',sub:'Own installation / own identities / own portfolio',tier:'ext',x:52,y:128,w:340,h:76,region:'user'},
+  ...capabilities.map(([id,title,sub],index) => ({id,title,sub,tier:'chan',x:52+index*306,y:292,w:290,h:92,region:'visual'})),
+  {id:'hub',title:'SE Assist desktop',sub:'Electron-owned feature orchestration|Active-account scope / deterministic facts|Shared model scheduling / validated persistence',tier:'app',x:748,y:492,w:424,h:146,classes:'hub',region:'application'},
+  {id:'ai',title:'Grounded assistance',sub:'Evidence-led synthesis / read-only investigation|Local agent specifications; remote model inference',tier:'ai',x:52,y:496,w:542,h:68,region:'assistance'},
+  {id:'actions',title:'Reviewable work & explicit actions',sub:'Local Tasks / workloads / saved outputs|User-directed CRM edits and Outlook reply-all drafts',tier:'obs',x:52,y:598,w:542,h:68,region:'assistance'},
+  {id:'sqlite',title:'Your local data foundation',sub:'SQLite: linked CRM + M365 evidence and ACR caches|Durable workloads / Tasks / notes / transcripts / outputs',tier:'data',x:1326,y:496,w:542,h:68,region:'foundation'},
+  {id:'recovery',title:'Honest data & recovery',sub:'Freshness / source labels / local backups and artifacts|Archive accounts in place; preserve authored history',tier:'data',x:1326,y:598,w:542,h:68,region:'foundation'},
+  {id:'ingest',title:'Ingest & link selected evidence',sub:'CRM + M365 collection -> normalization / redaction / account links',tier:'data',x:52,y:766,w:584,h:52,region:'pipeline'},
+  {id:'live',title:'Live research reads',sub:'Directory / documents / original email / public pages / enablement',tier:'data',x:668,y:766,w:584,h:52,region:'pipeline'},
+  {id:'analytics',title:'Project analytical queries',sub:'Power BI usage + capacity; persistent and transient caches differ',tier:'data',x:1284,y:766,w:584,h:52,region:'pipeline'},
+  {id:'work-sources',title:'Business + work sources',sub:'Dynamics / MSX|Microsoft 365 through WorkIQ',tier:'ext',x:52,y:964,w:424,h:68,region:'external'},
+  {id:'research-sources',title:'Research + enablement',sub:'M365 / Seismic|Readonly public search + publisher HTTPS',tier:'ext',x:516,y:964,w:424,h:68,region:'external'},
+  {id:'analytical-sources',title:'Analytical sources',sub:'Power BI / MSX-I|Revenue / capacity / token-usage models',tier:'ext',x:980,y:964,w:424,h:68,region:'external'},
+  {id:'inference',title:'Remote inference',sub:'GitHub Copilot / eligible Foundry|Explicit provider choice; no silent switch',tier:'ext',x:1444,y:964,w:424,h:68,region:'external'},
+];
+const sourceGroups = [
+  {title:'Product surfaces',note:'Routes, shared components and configurable navigation.',files:['src\\frontend\\src\\App.jsx','src\\frontend\\src\\lib\\navConfig.js']},
+  {title:'Application and account scope',note:'Privileged orchestration, active TPIDs, scoped work and archived history.',files:['desktop\\main.js','desktop\\app-ipc.js','desktop\\account-roster.js','desktop\\sqlite-ipc.js']},
+  {title:'Assistance and model admission',note:'In-process catalog/runtime, shared scheduling and strict provider selection.',files:['desktop\\services\\agents\\catalog.js','desktop\\services\\agents\\runtime.js','desktop\\services\\model-request-scheduler.js','desktop\\services\\copilot-provider.js']},
+  {title:'Evidence and research',note:'WorkIQ collection, Python ingestion and deterministic research orchestration.',files:['desktop\\services\\m365-ingest.js','desktop\\services\\workiq-client.js','desktop\\services\\work-outputs.js','desktop\\services\\work-output-research.js','desktop\\services\\work-agent-tools.js']},
+  {title:'Data freshness and recovery',note:'Persistent ACR caches, transient Foundry usage and consistent DB backups.',files:['desktop\\services\\acr-row-cache.js','desktop\\services\\foundry-usage.js','desktop\\services\\db-backup.js']},
+  {title:'Current-state technical reference',note:'Process, identity, persistence and workflow contracts.',files:['docs\\customer-workspace.md']},
+];
+function node(component) {
+  const element=document.createElement('div');
+  element.id=component.id;
+  element.className=`n t-${component.tier} ${component.classes || ''}`;
+  element.dataset.region=component.region;
+  Object.assign(element.style,{left:`${component.x}px`,top:`${component.y}px`,width:`${component.w}px`,height:`${component.h}px`});
+  const title=document.createElement('b');
+  title.textContent=component.title;
+  const sub=document.createElement('span');
+  sub.className='sub';
+  component.sub.split('|').forEach((text,index) => {
+    if(index) sub.append(document.createElement('br'));
+    sub.append(document.createTextNode(text));
+  });
+  element.append(title,sub);
+  element.setAttribute('aria-label',`${component.title}. ${component.sub.replaceAll('|','. ')}`);
+  document.getElementById('nodes').append(element);
+}
+nodes.forEach(node);
+sourceGroups.forEach(group => {
+  const entry=document.createElement('div');
+  entry.className='source-entry';
+  const title=document.createElement('b'),note=document.createElement('p');
+  title.textContent=group.title;
+  note.textContent=group.note;
+  entry.append(title,note);
+  group.files.forEach(file => {const code=document.createElement('code');code.textContent=file;entry.append(code);});
+  document.getElementById('source-index').append(entry);
+});
+const SVGNS='http://www.w3.org/2000/svg';
+const stage=document.getElementById('stage'),svg=document.getElementById('wires');
+const defs=document.createElementNS(SVGNS,'defs');
+defs.innerHTML='<marker id="af" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#2f6fd0"/></marker>';
+svg.append(defs);
+function box(id) {
+  const element=document.getElementById(id);
+  return {l:element.offsetLeft,t:element.offsetTop,r:element.offsetLeft+element.offsetWidth,b:element.offsetTop+element.offsetHeight,w:element.offsetWidth,h:element.offsetHeight,cx:element.offsetLeft+element.offsetWidth/2,cy:element.offsetTop+element.offsetHeight/2};
+}
+function pt(id,side,frac=.5) {
+  const b=box(id);
+  if(side==='r') return {x:b.r,y:b.t+b.h*frac};
+  if(side==='l') return {x:b.l,y:b.t+b.h*frac};
+  if(side==='t') return {x:b.l+b.w*frac,y:b.t};
+  return {x:b.l+b.w*frac,y:b.b};
+}
+function ortho(points,r=7) {
+  let d=`M ${points[0].x} ${points[0].y}`;
+  for(let i=1;i<points.length-1;i++) {
+    const p=points[i],a=points[i-1],b=points[i+1];
+    const d1={x:Math.sign(p.x-a.x),y:Math.sign(p.y-a.y)},d2={x:Math.sign(b.x-p.x),y:Math.sign(b.y-p.y)};
+    const rr=Math.min(r,Math.hypot(p.x-a.x,p.y-a.y)/2,Math.hypot(b.x-p.x,b.y-p.y)/2);
+    d+=` L ${p.x-d1.x*rr} ${p.y-d1.y*rr} Q ${p.x} ${p.y} ${p.x+d2.x*rr} ${p.y+d2.y*rr}`;
+  }
+  const e=points.at(-1);
+  return d+` L ${e.x} ${e.y}`;
+}
+const routes=[];
+function line(points,{id='',arrow=true}={}) {
+  const path=document.createElementNS(SVGNS,'path');
+  path.setAttribute('d',ortho(points));path.setAttribute('fill','none');path.setAttribute('stroke','#2f6fd0');path.setAttribute('stroke-width','2');
+  if(arrow) path.setAttribute('marker-end','url(#af)');
+  path.dataset.route=id;
+  svg.append(path);
+  routes.push({id,points,arrow,ctrl:false});
+}
+function tag(x,y,text) {
+  const element=document.createElement('div');
+  element.className='elabel';element.textContent=text;element.style.left=`${x}px`;element.style.top=`${y}px`;stage.append(element);
+}
+function wire(points,options={}) {line(points,options);if(options.label) tag(options.lx,options.ly,options.label);}
+function fit() {
+  const viewport=document.getElementById('viewport'),scale=Math.min(1,document.documentElement.clientWidth/1920);
+  viewport.style.width=`${1920*scale}px`;viewport.style.height=`${1080*scale}px`;stage.style.transform=`scale(${scale})`;
+}
+window.addEventListener('resize',fit);
+document.getElementById('reference').addEventListener('toggle',fit);
+fit();
+requestAnimationFrame(() => {
+  wire([pt('se','b'),{x:222,y:238},{x:960,y:238},pt('visual','t')],{id:'se-workspace',label:'choose a workspace',lx:960,ly:232});
+  wire([pt('visual','b'),pt('hub','t')],{id:'workspace-main',label:'invoke / results',lx:960,ly:450});
+  wire([pt('hub','l',38/146),pt('ai','r')],{id:'grounded-assistance',label:'bounded context',lx:671,ly:530});
+  wire([pt('hub','l',140/146),pt('actions','r')],{id:'explicit-actions',label:'explicit approval',lx:671,ly:632});
+  wire([pt('hub','r',38/146),pt('sqlite','l')],{id:'local-data',label:'read / save',lx:1249,ly:530});
+  wire([pt('hub','r',140/146),pt('recovery','l')],{id:'local-recovery',label:'freshness / backup',lx:1249,ly:632});
+  const ingestEntry=pt('hub','b',.18);
+  wire([ingestEntry,{x:ingestEntry.x,y:708},{x:344,y:708},pt('ingest','t')],{id:'ingest-context',label:'ingest selected data',lx:344,ly:710});
+  wire([pt('hub','b'),pt('live','t')],{id:'read-context',label:'live evidence',lx:960,ly:710});
+  const analyticalEntry=pt('hub','b',.82),inferenceEntry=pt('hub','b',.93);
+  wire([analyticalEntry,{x:analyticalEntry.x,y:696},{x:1576,y:696},pt('analytics','t')],{id:'query-analytics',label:'query / project',lx:1576,ly:710});
+  wire([inferenceEntry,{x:inferenceEntry.x,y:686},{x:1892,y:686},{x:1892,y:896},{x:1656,y:896},pt('inference','t')],{id:'remote-inference',label:'bounded grounding / inference',lx:1736,ly:896});
+  [['ingest','work-sources','authenticated reads',344,264],['live','research-sources','permitted live reads',960,728],['analytics','analytical-sources','semantic-model queries',1576,1192]].forEach(([from,to,label,sourceX,targetX]) => {
+    wire([pt(from,'b'),{x:sourceX,y:884},{x:targetX,y:884},pt(to,'t')],{id:`source-${from}`,label,lx:targetX,ly:910});
+  });
+  window.architecture={view:'overview',width:1920,height:1080,revision:'c2ff468',capabilities,nodes,sourceGroups,routes};
+  stage.dataset.ready='true';
+});
+</script>
+</body>
+</html>

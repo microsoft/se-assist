@@ -1,0 +1,177 @@
+// ── Generated HTML artifacts ─────────────────────────────────────────
+// Renders comprehensive summaries, tech-stack briefs, and model-emitted HTML to
+// standalone, styled files on disk so they're easy to read in a browser. The file
+// path is stored on the timeline event's metadata (htmlPath) and opened via the
+// se-open-file IPC handler.
+//
+// This module is a pure move out of app-ipc.js — no behavior changes.
+
+const path = require('path');
+const fs = require('fs');
+const { app } = require('electron');
+
+function generatedDir() {
+  const dir = path.join(app.getPath('userData'), 'generated');
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// Inline markdown on already-escaped text: bold, italic, code.
+function inlineMd(s) {
+  return s
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+// Lightweight markdown→HTML: headings, bullet/numbered lists, bold-only subheadings,
+// and paragraphs. The models emit markdown-ish plain text, so this keeps it readable.
+function markdownToHtml(md) {
+  const lines = String(md || '').replace(/\r\n/g, '\n').split('\n');
+  const out = [];
+  let listType = null;
+  let para = [];
+  const flushPara = () => {
+    if (para.length) { out.push('<p>' + inlineMd(escapeHtml(para.join(' '))) + '</p>'); para = []; }
+  };
+  const closeList = () => { if (listType) { out.push(`</${listType}>`); listType = null; } };
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    if (!line.trim()) { flushPara(); closeList(); continue; }
+    let m;
+    if ((m = line.match(/^(#{1,6})\s+(.*)$/))) {
+      flushPara(); closeList();
+      const level = Math.min(m[1].length + 1, 6);
+      out.push(`<h${level}>${inlineMd(escapeHtml(m[2]))}</h${level}>`);
+      continue;
+    }
+    if ((m = line.match(/^\*\*(.+?)\*\*:?\s*$/))) {
+      flushPara(); closeList();
+      out.push(`<h3>${inlineMd(escapeHtml(m[1]))}</h3>`);
+      continue;
+    }
+    if ((m = line.match(/^\s*[-*•]\s+(.*)$/))) {
+      flushPara();
+      if (listType !== 'ul') { closeList(); out.push('<ul>'); listType = 'ul'; }
+      out.push(`<li>${inlineMd(escapeHtml(m[1]))}</li>`);
+      continue;
+    }
+    if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) {
+      flushPara();
+      if (listType !== 'ol') { closeList(); out.push('<ol>'); listType = 'ol'; }
+      out.push(`<li>${inlineMd(escapeHtml(m[1]))}</li>`);
+      continue;
+    }
+    para.push(line.trim());
+  }
+  flushPara(); closeList();
+  return out.join('\n');
+}
+
+function renderHtmlDocument({ title, subtitle, bodyMarkdown, meta }) {
+  const counts = meta?.counts || {};
+  const chips = Object.entries(counts)
+    .filter(([, v]) => v != null)
+    .map(([k, v]) => `<span class="chip">${escapeHtml(k)}: ${escapeHtml(String(v))}</span>`)
+    .join('');
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)}</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #ffffff; color: #1f2333;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; line-height: 1.6; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 40px 28px 80px; }
+  header { border-bottom: 1px solid #dbe0e8; padding-bottom: 18px; margin-bottom: 28px; }
+  h1 { font-size: 24px; margin: 0 0 6px; color: #1f2333; }
+  .subtitle { color: #616880; font-size: 13px; }
+  .chips { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { background: #f2f4f8; border: 1px solid #dbe0e8; border-radius: 12px;
+    padding: 3px 12px; font-size: 12px; color: #474d60; }
+  h2 { font-size: 19px; margin: 30px 0 10px; color: #4c63d2; border-bottom: 1px solid #dbe0e8; padding-bottom: 6px; }
+  h3 { font-size: 15px; margin: 22px 0 8px; color: #8b5cf0; }
+  p { margin: 10px 0; }
+  ul, ol { margin: 8px 0 14px; padding-left: 24px; }
+  li { margin: 4px 0; }
+  strong { color: #a97b09; }
+  code { background: #f2f4f8; border: 1px solid #dbe0e8; border-radius: 4px; padding: 1px 5px; font-size: 12.5px; }
+  footer { margin-top: 48px; color: #616880; font-size: 11px; border-top: 1px solid #dbe0e8; padding-top: 14px; }
+  @media print { body { background: #fff; color: #1a1a1a; } .chip, code { background: #f0f0f0; } h2 { color: #1a4ba8; } h3 { color: #6b3fa0; } strong { color: #8a6d00; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>${escapeHtml(title)}</h1>
+      <div class="subtitle">${escapeHtml(subtitle || '')}</div>
+      ${chips ? `<div class="chips">${chips}</div>` : ''}
+    </header>
+    <main>${markdownToHtml(bodyMarkdown)}</main>
+    <footer>Generated by SE Assist${meta?.deployment ? ` · ${escapeHtml(meta.deployment)}` : ''}${meta?.source ? ` · ${escapeHtml(meta.source)}` : ''}</footer>
+  </div>
+</body>
+</html>`;
+}
+
+// Renders the brief to a standalone HTML file under the generated dir and returns the
+// absolute path (or null on failure — HTML is a convenience, never blocks the save).
+function writeHtmlArtifact(kind, id, { title, occurredAt, summary, metadata }) {
+  try {
+    const html = renderHtmlDocument({
+      title,
+      subtitle: `Generated ${new Date(occurredAt).toLocaleString()}`,
+      bodyMarkdown: summary,
+      meta: metadata,
+    });
+    const file = path.join(generatedDir(), `${kind}-${id}.html`);
+    fs.writeFileSync(file, html, 'utf8');
+    return file;
+  } catch {
+    return null;
+  }
+}
+
+function extractHtmlDocument(raw) {
+  let s = String(raw || '').trim();
+  // Strip a wrapping ```html ... ``` (or bare ```) fence if present.
+  s = s.replace(/^```[a-zA-Z]*\s*\n?/, '').replace(/\n?```$/, '').trim();
+  const lower = s.toLowerCase();
+  let start = lower.indexOf('<!doctype');
+  if (start < 0) start = lower.indexOf('<html');
+  const end = lower.lastIndexOf('</html>');
+  if (start < 0 || end < 0 || end <= start) return null;
+  return s.slice(start, end + '</html>'.length);
+}
+
+// Writes a raw HTML string to the generated dir and returns its path (or null).
+function writeRawHtmlArtifact(kind, id, html) {
+  try {
+    const file = path.join(generatedDir(), `${kind}-${id}.html`);
+    fs.writeFileSync(file, html, 'utf8');
+    return file;
+  } catch {
+    return null;
+  }
+}
+
+module.exports = {
+  generatedDir,
+  escapeHtml,
+  inlineMd,
+  markdownToHtml,
+  renderHtmlDocument,
+  writeHtmlArtifact,
+  extractHtmlDocument,
+  writeRawHtmlArtifact,
+};

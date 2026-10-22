@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>SE Assist - runtime and trust boundaries</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --ink:#1d2b47; --dim:#596a80;
+    --app:#2f6fd0; --appbg:#e3edfb; --appedge:#b3cbec;
+    --ai:#6a5cd6; --aibg:#f0edfc; --aiedge:#cdc6ed;
+    --data:#138876; --databg:#e7f4ef; --dataedge:#b4d9cf;
+    --ext:#5b6b86; --extbg:#edf0f6; --extedge:#c7d0df;
+    --chan:#a551b8; --chanbg:#f7edf9; --chanedge:#dec1e5;
+    --obs:#a86c20; --obsbg:#fbf2e5; --obsedge:#e5ceac;
+    --flow:#2f6fd0; --ctrl:#8a97ac; --cardedge:#d6deea;
+  }
+  * { box-sizing:border-box; margin:0; padding:0 }
+  html,body { background:#edf1f7; color:var(--ink); font-family:"Segoe UI",Arial,sans-serif }
+  #viewport { position:relative; height:min(56.25vw,1080px); margin:0 auto; overflow:hidden }
+  #stage {
+    position:absolute; width:1920px; height:1080px; overflow:hidden; transform-origin:top left;
+    -webkit-font-smoothing:antialiased;
+    background:radial-gradient(1900px 1000px at 50% 0,#fff 0,#f5f7fb 65%,#edf1f7 100%);
+  }
+  .h-title { position:absolute; left:28px; top:18px; font-size:28px; font-weight:700; z-index:6 }
+  .h-sub { position:absolute; left:28px; top:58px; font-size:12px; color:var(--dim); z-index:6 }
+  .boundary { position:absolute; left:20px; top:104px; width:1880px; height:782px; border:1px dashed #a8b5c8; border-radius:14px }
+  .boundary-title { position:absolute; left:36px; top:94px; padding:0 7px; background:#f8fafd; font-size:12px; color:var(--dim); font-weight:600; z-index:2 }
+  .zone { position:absolute; border:1px solid; border-radius:12px; z-index:1 }
+  .zone.process { border-style:dashed }
+  .zh { position:absolute; top:10px; left:15px; font-size:12px; font-weight:700; letter-spacing:.5px }
+  .n {
+    position:absolute; display:flex; flex-direction:column; justify-content:center; gap:3px;
+    padding:5px 14px; background:#fff; border:1px solid var(--cardedge); border-radius:8px; z-index:4;
+  }
+  .n b { font-size:16px; font-weight:600; line-height:1.2; white-space:nowrap }
+  .n .sub { font-size:12px; color:var(--dim); line-height:1.2; white-space:nowrap }
+  .n.hub { background:var(--appbg); border:1.5px solid var(--app); box-shadow:0 0 0 4px rgba(47,111,208,.10); padding:18px 24px; gap:12px; z-index:5 }
+  .n.hub b { font-weight:700 }
+  .n.t-app { border-left:3px solid var(--app) }
+  .n.t-ai { border-left:3px solid var(--ai) }
+  .n.t-data { border-left:3px solid var(--data) }
+  .n.t-ext { border-left:3px solid var(--ext) }
+  .n.t-chan { border-left:3px solid var(--chan) }
+  .n.t-obs { border-left:3px solid var(--obs) }
+  svg#wires { position:absolute; inset:0; width:1920px; height:1080px; z-index:3; pointer-events:none }
+  .elabel { position:absolute; z-index:4; font-size:12px; line-height:1.1; color:#33425e; background:#fff; border:1px solid #d3dce9; border-radius:6px; padding:3px 6px; transform:translate(-50%,-50%); white-space:nowrap }
+  .legend { position:absolute; right:28px; top:18px; display:flex; flex-direction:column; gap:7px; padding:8px 12px; border:1px solid #d1daea; border-radius:8px; background:#fff; z-index:6 }
+  .legend-row { display:flex; align-items:center; gap:12px; font-size:12px; color:var(--dim) }
+  .key { display:inline-flex; align-items:center; gap:5px }
+  .sw { width:22px; border-top:2px solid var(--flow) }
+  .sw.d { border-top:2px dashed var(--ctrl) }
+  .rail { width:3px; height:13px; background:var(--chan) }
+  .foot { position:absolute; left:36px; top:1058px; font-size:12px; color:var(--dim); z-index:6 }
+  .view-nav { display:flex; flex-wrap:wrap; justify-content:center; gap:10px 24px; margin:20px; font-size:16px }
+  a { color:#245da9 }
+  #reference { max-width:1440px; margin:24px auto; padding:20px; background:#fff; border:1px solid var(--cardedge); border-radius:12px; font-size:16px; line-height:1.5 }
+  #reference summary { font-weight:600; cursor:pointer }
+  #reference p { margin:12px 0 }
+  #reference h2 { font-size:16px; margin:20px 0 8px }
+  #reference ul { padding-left:24px }
+  #reference code { font-size:12px; overflow-wrap:anywhere }
+  .source-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px }
+  .source-entry { padding:12px; border:1px solid var(--cardedge); border-radius:8px }
+  .source-entry p,.source-entry code { display:block; margin:5px 0; font-size:12px }
+  @media print {
+    @page { size:20in 11.25in; margin:0 }
+    html,body { background:white }
+    #viewport { width:1920px !important; height:1080px !important }
+    #stage { transform:none !important }
+    #reference,.view-nav { display:none }
+  }
+</style>
+</head>
+<body>
+<div id="viewport">
+<main id="stage" aria-label="SE Assist runtime: outer shell and guest renderers, isolated preload, privileged main-owned agents and tools, local WorkIQ and Python processes, local state and remote services">
+  <h1 class="h-title">SE Assist | Runtime &amp; trust boundaries</h1>
+  <p class="h-sub">One independent installation | Process / context ownership, privileged execution, persistence and remote data egress | Selected call paths</p>
+  <div class="legend" aria-label="Diagram legend">
+    <div class="legend-row"><span class="key"><i class="sw"></i> call / data path</span><span class="key"><i class="sw d"></i> admission / control</span><span>Dashed enclosures = device or process/context boundary</span></div>
+    <div class="legend-row">
+      <span class="key"><i class="rail"></i> renderer</span>
+      <span class="key"><i class="rail" style="background:var(--app)"></i> main</span>
+      <span class="key"><i class="rail" style="background:var(--ai)"></i> AI</span>
+      <span class="key"><i class="rail" style="background:var(--obs)"></i> execution</span>
+      <span class="key"><i class="rail" style="background:var(--data)"></i> state</span>
+      <span class="key"><i class="rail" style="background:var(--ext)"></i> integrations</span>
+    </div>
+  </div>
+  <div class="boundary" data-boundary="device"></div>
+  <p class="boundary-title">LOCAL WINDOWS DEVICE | no hosted application backend and no shared team database</p>
+  <section class="zone process" id="renderer" data-boundary="renderer-contexts" style="left:36px;top:124px;width:1848px;height:152px;background:var(--chanbg);border-color:var(--chanedge)">
+    <h2 class="zh" style="color:var(--chan)">RENDERER CONTEXTS | outer shell + application guest, with distinct isolated preloads; neither is Electron main</h2>
+  </section>
+  <section class="zone process" id="children" data-boundary="child-contexts" style="left:36px;top:320px;width:300px;height:506px;background:var(--extbg);border-color:var(--extedge)">
+    <h2 class="zh" style="color:var(--ext)">LOCAL CHILD / BROWSER CONTEXTS</h2>
+  </section>
+  <section class="zone process" id="main-process" data-boundary="main-process" style="left:380px;top:320px;width:1028px;height:506px;background:var(--appbg);border-color:var(--appedge)">
+    <h2 class="zh" style="color:var(--app)">PRIVILEGED ELECTRON MAIN PROCESS | agents, tools, domain services, guards and clients are in-process code</h2>
+  </section>
+  <section class="zone" id="stores" style="left:1444px;top:320px;width:440px;height:344px;background:var(--databg);border-color:var(--dataedge)">
+    <h2 class="zh" style="color:var(--data)">LOCAL PERSISTENCE + TRANSIENT STATE</h2>
+  </section>
+  <section class="zone process" id="python-process" data-boundary="python-process" style="left:1444px;top:702px;width:440px;height:124px;background:var(--databg);border-color:var(--dataedge)">
+    <h2 class="zh" style="color:var(--data)">LOCAL PYTHON INGESTION PROCESS</h2>
+  </section>
+  <section class="zone" id="external" style="left:36px;top:924px;width:1848px;height:124px;background:var(--extbg);border-color:var(--extedge)">
+    <h2 class="zh" style="color:var(--ext)">REMOTE ENDPOINTS</h2>
+  </section>
+  <svg id="wires" aria-hidden="true"></svg>
+  <div id="nodes"></div>
+  <p class="foot">Returns are implicit except IPC events. Research tools are read-only. CRM mutations and Outlook drafts require explicit actions; the app never sends email.</p>
+</main>
+</div>
+<nav class="view-nav" aria-label="Architecture views">
+  <a href="se-assist-overview.html">1 Solution overview</a>
+  <a href="se-assist-runtime.html" aria-current="page">2 Runtime &amp; trust boundaries</a>
+  <a href="se-assist-components.html">3 Component reference</a>
+  <a href="se-assist-runtime.png" download>Download this PNG</a>
+</nav>
+<details id="reference">
+  <summary>Process ownership, identity and action contracts, source anchors and design notes</summary>
+  <p><strong>Use this view to explain execution and data trust.</strong> Shaded process/context regions describe ownership; source-category cards are groupings, not new intermediary services. Main-process agents, tool implementations, adapters and domain services are enclosed together. Local files, SQLite and transient state are separate from that execution boundary.</p>
+  <h2>Renderer and preload boundaries</h2>
+  <ul>
+    <li><code>desktop\main.js</code> creates the outer BrowserWindow with <code>shell-preload.js</code>, context isolation enabled and Node integration disabled. <code>shell.html</code> hosts the application in a <code>webview</code>.</li>
+    <li>The embedded application guest uses <code>se-assist-preload.js</code>, not the shell preload. Its isolated preload exposes <code>seAssistAPI</code>; React-side <code>electronBridge.js</code> wraps invoke calls and progress events.</li>
+    <li>React owns presentation and transient UI state, including CRM sync coordination. Privileged requests cross IPC; app React code does not directly open SQLite, read credentials or launch subprocesses. The shell preload only exposes a version property.</li>
+  </ul>
+  <h2>Privileged execution and account scope</h2>
+  <ul>
+    <li>Main registers feature IPC and owns external clients, credentials, persistence, agent execution and child-process lifecycle. Payload and active-account checks happen there; a renderer-facing SQL path also applies connection-local account-write protection.</li>
+    <li>The saved User Home TPIDs are the active roster. Reads use <code>active_*</code> views; account work holds roster leases. Archiving changes membership, not durable user history. This is portfolio scope, not a replacement for upstream authorization.</li>
+    <li>The catalog has 23 local agent specifications. Only Work Agent has a model-selected loop: four read-only WorkIQ functions and two public-web functions. Other catalog grounding inputs and Work Outputs source orchestration are deterministic application code.</li>
+    <li>Local Tasks, workloads, notes, links and saved outputs are validated application writes. CRM mutations and Outlook reply-all draft creation are explicit application actions, not research-tool capabilities; no email-send action is provided.</li>
+  </ul>
+  <h2>Identity, remote inference and subprocesses</h2>
+  <ul>
+    <li>Microsoft/Power BI and GitHub identity caches use OS-encrypted <code>safeStorage</code>, not SQLite token tables. WorkIQ maintains its own M365 identity/cache. Seismic OIDC remains in its isolated persistent Electron browser context.</li>
+    <li>All model work enters the shared scheduler. Desktop-launched Python AI holds an external scheduler slot for its subprocess duration. The model provider card represents clients, not a local model server.</li>
+    <li>Connected Copilot is an explicit provider choice. A connected-provider failure does not switch to Foundry; Foundry is eligible only when Copilot is disconnected, configuration is complete and the feature permits it. Work Agent, Work Outputs/research, influence analysis and ingestion AI are Copilot-only.</li>
+    <li>WorkIQ is a tracked local MCP subprocess over stdio JSON-RPC. The application stages selected M365 JSON, launches Python, then normalizes, redacts, links and upserts into the same <code>seassist.db</code> used by main. Staging is transient, not a second durable data store.</li>
+    <li>Local-first does not mean local-only inference. Bounded grounding leaves the device for remote models; public queries are scrubbed and direct publisher reads omit user cookies/credentials.</li>
+  </ul>
+  <h2>Persistence versus caches</h2>
+  <p>SQLite contains synced CRM/M365 evidence, durable authored work and ACR row caches. Backup/report/dossier files and encrypted credential caches are local files, not database rows. Foundry Deep-Dives usage is a 15-minute identity-scoped memory cache and is not written to SQLite. Live directory, document and original-email reads are not all ingested.</p>
+  <h2>Source anchors</h2>
+  <div id="source-index" class="source-grid"></div>
+  <h2>Design notes</h2>
+  <p>1920 x 1080, 16:9. Adapted from the architecture-diagram HTML/SVG engine: one orchestration hub, common-region process/context ownership, orthogonal single-ended labelled connectors, semantic rails and three type sizes (28 / 16 / 12). Renderer contexts are above main; agents/tools are inside main on its left; local state is on its right. Seismic/WorkIQ contexts and Python are explicitly outside main while remaining on the same device.</p>
+  <p>This is view 2 of the three-view set. Unlike the component reference, an enclosing main-process region has literal ownership meaning. The Python-to-SQLite relationship shows a second writer to the same database, not an ingestion service or cloud copy. The external categories condense protocol destinations without inventing a universal integration bus. Selected paths omit repeated calls and implicit responses rather than imply that every feature calls every adapter. No credentials, customer records or tenant inventory are embedded.</p>
+</details>
+<script>
+const nodes = [
+  {id:'shell',title:'Outer shell renderer',sub:'shell.html + shell-preload.js|Hosts the application webview',tier:'chan',x:52,y:164,w:300,h:82,region:'renderer'},
+  {id:'react',title:'Application guest renderer',sub:'React / Fluent UI / transient UI state|Includes CRM sync coordination',tier:'chan',x:456,y:164,w:380,h:82,region:'renderer'},
+  {id:'preload',title:'Guest preload / isolated world',sub:'se-assist-preload.js -> seAssistAPI|electronBridge.js wraps invoke + events',tier:'chan',x:940,y:164,w:416,h:82,region:'renderer'},
+  {id:'ui-contract',title:'App UI isolation contract',sub:'React has no direct Node / SQLite / token access|Privileged work crosses the preload / IPC boundary',tier:'chan',x:1456,y:164,w:412,h:82,region:'renderer'},
+  {id:'runtime',title:'Agent runtime + catalog',sub:'23 local specifications / bounded grounding|Most agents: completion, not autonomous tools',tier:'ai',x:400,y:364,w:352,h:74,region:'main-process'},
+  {id:'actions',title:'Domain services + explicit actions',sub:'Local work / reports / source access|CRM edits + Outlook drafts need user action',tier:'obs',x:400,y:480,w:352,h:74,region:'main-process'},
+  {id:'tools',title:'Grounding + read-only tools',sub:'Only Work Agent: 4 WorkIQ + 2 web functions|Work Outputs research is deterministic orchestration',tier:'obs',x:400,y:596,w:352,h:74,region:'main-process'},
+  {id:'hub',title:'Privileged feature orchestration',sub:'IPC routing / domain workflows / child lifecycle|Deterministic joins, calculations and persistence|Renderer-safe results and explicit failures',tier:'app',x:852,y:364,w:532,h:142,classes:'hub',region:'main-process'},
+  {id:'guards',title:'Identity, active roster & write controls',sub:'Service-specific tokens / saved TPIDs / active_* views|Scoped work leases / validated writes / user-controlled actions',tier:'app',x:852,y:548,w:532,h:74,region:'main-process'},
+  {id:'scheduler',title:'Scheduler + model clients',sub:'All model work + Python AI slots|Copilot / feature-eligible Foundry|No silent provider substitution',tier:'ai',x:852,y:690,w:248,h:92,region:'main-process'},
+  {id:'adapters',title:'Independent source clients',sub:'Dynamics REST / Power BI REST|Readonly public MCP + HTTPS|No universal integration broker',tier:'ext',x:1136,y:690,w:248,h:92,region:'main-process'},
+  {id:'seismic',title:'Seismic browser context',sub:'Persistent isolated Electron session|OIDC stays inside that context|Main invokes authenticated search',tier:'ext',x:52,y:402,w:268,h:100,region:'children'},
+  {id:'workiq',title:'WorkIQ MCP subprocess',sub:'Local stdio JSON-RPC server|Separate M365 identity + cache|Main owns the singleton client',tier:'ext',x:52,y:662,w:268,h:100,region:'children'},
+  {id:'sqlite',title:'SQLite (WAL + active_* views)',sub:'CRM / M365 evidence / ACR row cache|Durable Tasks / workloads / notes / outputs|Main and Python open the same seassist.db',tier:'data',x:1460,y:364,w:408,h:80,region:'stores'},
+  {id:'files',title:'Local files + encrypted auth caches',sub:'Backups / reports / dossier / generated artifacts|Entra + GitHub safeStorage; no plaintext fallback',tier:'data',x:1460,y:488,w:408,h:64,region:'stores'},
+  {id:'memory',title:'Transient usage cache',sub:'Foundry Deep-Dives: 15 min / identity-scoped|These usage rows are not stored in SQLite',tier:'data',x:1460,y:580,w:408,h:64,region:'stores'},
+  {id:'python',title:'Python ingestion',sub:'Staged M365 JSON -> normalize / redact / link|Writes same SQLite; AI admitted by shared scheduler',tier:'data',x:1460,y:744,w:408,h:64,region:'python-process'},
+  {id:'seismic-remote',title:'Seismic DocCenter',sub:'Authenticated browser-session HTTPS',tier:'ext',x:52,y:966,w:300,h:64,region:'external'},
+  {id:'m365-remote',title:'Microsoft 365 / enterprise',sub:'WorkIQ reads + explicit permitted actions|Own sign-in, not the CRM token',tier:'ext',x:420,y:966,w:352,h:64,region:'external'},
+  {id:'models-remote',title:'Remote model providers',sub:'GitHub Copilot / eligible Foundry|Bounded grounding leaves the device',tier:'ext',x:836,y:966,w:352,h:64,region:'external'},
+  {id:'direct-remote',title:'Direct API / public endpoints',sub:'Dynamics / MSX + Power BI / MSX-I (scoped Microsoft tokens)|Copilot readonly web MCP + public publishers (separate read paths)',tier:'ext',x:1252,y:966,w:616,h:64,region:'external'},
+];
+const sourceGroups = [
+  {title:'Shell versus guest',note:'BrowserWindow isolation, shell markup and the distinct guest preload injection.',files:['desktop\\main.js','desktop\\shell.html','desktop\\shell-preload.js','desktop\\se-assist-preload.js','src\\frontend\\src\\electronBridge.js']},
+  {title:'Main and account controls',note:'Privileged feature routing, DB lifecycle, account work guards and active read/write views.',files:['desktop\\app-ipc.js','desktop\\sqlite-ipc.js','desktop\\account-roster.js','desktop\\migrations\\036_active_roster.sql']},
+  {title:'Agents, research and actions',note:'In-process runtime, six allowlisted research functions and deterministic Work Outputs orchestration.',files:['desktop\\services\\agents\\catalog.js','desktop\\services\\agents\\runtime.js','desktop\\services\\work-agent-tools.js','desktop\\services\\work-agent-web.js','desktop\\services\\work-outputs.js','desktop\\msx-ipc.js']},
+  {title:'AI admission and providers',note:'One scheduler for internal and external model work; provider identity is not silently changed.',files:['desktop\\services\\model-request-scheduler.js','desktop\\services\\copilot-provider.js','desktop\\services\\m365-ingest.js']},
+  {title:'Local child contexts',note:'Main-owned WorkIQ process/client, Seismic browser context and Python SQLite ingestion.',files:['desktop\\services\\workiq-client.js','desktop\\services\\workiq-auth.js','desktop\\services\\seismic-service.js','desktop\\services\\m365-ingest.js','tools\\email\\ingest_emails.py','tools\\common\\linking.py']},
+  {title:'Identity, persistence and caches',note:'Separate credential lifecycles, persistent ACR rows, memory-only Foundry usage and backups.',files:['desktop\\services\\entra-auth.js','desktop\\services\\github-auth.js','desktop\\services\\secure-store.js','desktop\\services\\acr-row-cache.js','desktop\\services\\foundry-usage.js','desktop\\services\\db-backup.js']},
+];
+function node(component) {
+  const element=document.createElement('div');
+  element.id=component.id;element.className=`n t-${component.tier} ${component.classes || ''}`;element.dataset.region=component.region;
+  Object.assign(element.style,{left:`${component.x}px`,top:`${component.y}px`,width:`${component.w}px`,height:`${component.h}px`});
+  const title=document.createElement('b'),sub=document.createElement('span');
+  title.textContent=component.title;sub.className='sub';
+  component.sub.split('|').forEach((text,index) => {if(index) sub.append(document.createElement('br'));sub.append(document.createTextNode(text));});
+  element.append(title,sub);element.setAttribute('aria-label',`${component.title}. ${component.sub.replaceAll('|','. ')}`);
+  document.getElementById('nodes').append(element);
+}
+nodes.forEach(node);
+sourceGroups.forEach(group => {
+  const entry=document.createElement('div');entry.className='source-entry';
+  const title=document.createElement('b'),note=document.createElement('p');title.textContent=group.title;note.textContent=group.note;entry.append(title,note);
+  group.files.forEach(file => {const code=document.createElement('code');code.textContent=file;entry.append(code);});
+  document.getElementById('source-index').append(entry);
+});
+const SVGNS='http://www.w3.org/2000/svg';
+const stage=document.getElementById('stage'),svg=document.getElementById('wires');
+const defs=document.createElementNS(SVGNS,'defs');
+defs.innerHTML='<marker id="af" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#2f6fd0"/></marker>'+
+  '<marker id="ac" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#8a97ac"/></marker>';
+svg.append(defs);
+function box(id) {
+  const element=document.getElementById(id);
+  return {l:element.offsetLeft,t:element.offsetTop,r:element.offsetLeft+element.offsetWidth,b:element.offsetTop+element.offsetHeight,w:element.offsetWidth,h:element.offsetHeight,cx:element.offsetLeft+element.offsetWidth/2,cy:element.offsetTop+element.offsetHeight/2};
+}
+function pt(id,side,frac=.5) {
+  const b=box(id);
+  if(side==='r') return {x:b.r,y:b.t+b.h*frac};
+  if(side==='l') return {x:b.l,y:b.t+b.h*frac};
+  if(side==='t') return {x:b.l+b.w*frac,y:b.t};
+  return {x:b.l+b.w*frac,y:b.b};
+}
+function ortho(points,r=7) {
+  let d=`M ${points[0].x} ${points[0].y}`;
+  for(let i=1;i<points.length-1;i++) {
+    const p=points[i],a=points[i-1],b=points[i+1],d1={x:Math.sign(p.x-a.x),y:Math.sign(p.y-a.y)},d2={x:Math.sign(b.x-p.x),y:Math.sign(b.y-p.y)};
+    const rr=Math.min(r,Math.hypot(p.x-a.x,p.y-a.y)/2,Math.hypot(b.x-p.x,b.y-p.y)/2);
+    d+=` L ${p.x-d1.x*rr} ${p.y-d1.y*rr} Q ${p.x} ${p.y} ${p.x+d2.x*rr} ${p.y+d2.y*rr}`;
+  }
+  const e=points.at(-1);return d+` L ${e.x} ${e.y}`;
+}
+const routes=[];
+function line(points,{id='',ctrl=false,arrow=true}={}) {
+  const path=document.createElementNS(SVGNS,'path');
+  path.setAttribute('d',ortho(points));path.setAttribute('fill','none');path.setAttribute('stroke',ctrl?'#8a97ac':'#2f6fd0');path.setAttribute('stroke-width',ctrl?'1.5':'2');
+  if(ctrl) path.setAttribute('stroke-dasharray','5 4');
+  if(arrow) path.setAttribute('marker-end',ctrl?'url(#ac)':'url(#af)');
+  path.dataset.route=id;svg.append(path);routes.push({id,points,ctrl,arrow});
+}
+function tag(x,y,text) {
+  const element=document.createElement('div');element.className='elabel';element.textContent=text;element.style.left=`${x}px`;element.style.top=`${y}px`;stage.append(element);
+}
+function wire(points,options={}) {line(points,options);if(options.label) tag(options.lx,options.ly,options.label);}
+function fit() {
+  const viewport=document.getElementById('viewport'),scale=Math.min(1,document.documentElement.clientWidth/1920);
+  viewport.style.width=`${1920*scale}px`;viewport.style.height=`${1080*scale}px`;stage.style.transform=`scale(${scale})`;
+}
+window.addEventListener('resize',fit);
+document.getElementById('reference').addEventListener('toggle',fit);
+fit();
+requestAnimationFrame(() => {
+  wire([pt('shell','r'),pt('react','l')],{id:'shell-guest',label:'hosts guest',lx:404,ly:205});
+  wire([pt('react','r'),pt('preload','l')],{id:'react-preload',label:'narrow API',lx:888,ly:205});
+  const request=pt('preload','b',.4),entry=pt('hub','t',.5);
+  wire([request,{x:request.x,y:302},{x:entry.x,y:302},entry],{id:'ipc-invoke',label:'invoke / validated in main',lx:1060,ly:302});
+  const result=pt('hub','t',.84),response=pt('preload','b',.84);
+  wire([result,{x:result.x,y:288},{x:response.x,y:288},response],{id:'ipc-results',label:'results / progress',lx:1310,ly:288});
+  wire([pt('hub','l',37/142),pt('runtime','r')],{id:'main-agent',label:'run',lx:802,ly:401});
+  wire([pt('runtime','b'),{x:576,y:458},{x:772,y:458},{x:772,y:633},pt('tools','r')],{id:'agent-tools',label:'Work Agent only',lx:664,ly:458});
+  wire([pt('runtime','r',59/74),{x:800,y:423},{x:800,y:736},pt('scheduler','l')],{id:'agent-scheduler',label:'model slot',lx:800,ly:680});
+  wire([pt('hub','b'),pt('guards','t')],{id:'main-guards',ctrl:true,label:'validate',lx:1118,ly:527});
+  wire([pt('guards','b',124/532),pt('scheduler','t')],{id:'model-guard',ctrl:true,label:'admit',lx:976,ly:655});
+  wire([pt('guards','b',408/532),pt('adapters','t')],{id:'source-guard',ctrl:true,label:'scope / auth',lx:1260,ly:655});
+  wire([pt('actions','l'),{x:360,y:517},{x:360,y:452},pt('seismic','r')],{id:'seismic-session',label:'session',lx:360,ly:488});
+  wire([pt('tools','l'),{x:360,y:633},{x:360,y:712},pt('workiq','r')],{id:'tools-workiq',label:'stdio MCP',lx:360,ly:690});
+  wire([pt('hub','r',45/142),{x:1412,y:409},{x:1412,y:468},{x:1664,y:468},pt('sqlite','b')],{id:'main-sqlite',label:'read / save',lx:1570,ly:468});
+  wire([pt('hub','r',136/142),{x:1424,y:500},{x:1424,y:776},pt('python','l')],{id:'main-python',label:'spawn',lx:1424,ly:686});
+  const upsert=pt('python','t',.9);
+  wire([upsert,{x:upsert.x,y:686},{x:1894,y:686},{x:1894,y:404},pt('sqlite','r')],{id:'python-sqlite',label:'same DB upsert',lx:1840,ly:686});
+  wire([pt('seismic','l'),{x:28,y:452},{x:28,y:854},{x:202,y:854},pt('seismic-remote','t')],{id:'seismic-https',label:'browser-session HTTPS',lx:202,ly:900});
+  wire([pt('workiq','r',.8),{x:348,y:742},{x:348,y:878},{x:596,y:878},pt('m365-remote','t')],{id:'workiq-m365',label:'WorkIQ-owned M365 identity',lx:596,ly:900});
+  wire([pt('scheduler','b'),{x:976,y:866},{x:1012,y:866},pt('models-remote','t')],{id:'scheduled-inference',label:'scheduled remote inference',lx:1012,ly:900});
+  wire([pt('adapters','b'),{x:1260,y:850},{x:1560,y:850},pt('direct-remote','t')],{id:'direct-source-calls',label:'independent HTTPS / MCP clients',lx:1560,ly:900});
+  window.architecture={view:'runtime',width:1920,height:1080,revision:'c2ff468',nodes,sourceGroups,routes};
+  stage.dataset.ready='true';
+});
+</script>
+</body>
+</html>
